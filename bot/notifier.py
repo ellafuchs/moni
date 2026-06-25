@@ -1,14 +1,28 @@
+import os
 import smtplib
 from dataclasses import dataclass
 from email.message import EmailMessage
+from pathlib import Path
 from typing import List
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
-# move to the config
-SENDER = "excelberl@gmail.com"
-PASSWORD = "mzhm xnwo etwx gfej"
+
+def _load_env():
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, value = line.partition("=")
+                os.environ.setdefault(key.strip(), value.strip())
+
+
+_load_env()
+
+SENDER = os.environ.get("MONI_SENDER", "")
+PASSWORD = os.environ.get("MONI_PASSWORD", "")
 
 
 @dataclass
