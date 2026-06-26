@@ -37,7 +37,7 @@ class ConfigManager:
 
         self.api_key = config.get("api_key")
         self.model_name = config.get("model_name")
-        self.mailing_list = config.get("mailing_list")
+        self.mailing_list = list(config.get("mailing_list"))
         self.notifier_email = config.get("notifier").get("email")
         self.notifier_password = config.get("notifier").get("password")
         self.last_master_update = config.get("last_master_update")
