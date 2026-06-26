@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -20,6 +21,9 @@ class ConfigManager:
         self.mailing_list: list[str] | None = None
         self.notifier_email: str | None = None
         self.notifier_password: str | None = None
+        self.last_master_update: str | None = None
+        self.last_master_filename: str | None = None
+        self.schedule: list[dict] | None = None
 
         self._load()
 
@@ -36,6 +40,9 @@ class ConfigManager:
         self.mailing_list = config.get("mailing_list")
         self.notifier_email = config.get("notifier").get("email")
         self.notifier_password = config.get("notifier").get("password")
+        self.last_master_update = config.get("last_master_update")
+        self.last_master_filename = config.get("last_master_filename")
+        self.schedule = config.get("schedule")
 
         self.ids = {}
         for program in config.get("programs"):
@@ -50,6 +57,9 @@ class ConfigManager:
                 "email": self.notifier_email,
                 "password": self.notifier_password,
             },
+            "last_master_update": self.last_master_update,
+            "last_master_filename": self.last_master_filename,
+            "schedule": self.schedule,
             "programs": [],
         }
 
@@ -94,6 +104,24 @@ class ConfigManager:
         self.notifier_password = notifier_password
         self._save()
 
+    def get_last_master(self) -> dict:
+        return {
+            "date": self.last_master_update,
+            "name": self.last_master_filename,
+        }
+
+    def set_last_master(self, date: str, name: str) -> None:
+        self.last_master_update = date
+        self.last_master_filename = name
+        self._save()
+
+    def get_schedule(self) -> list[dict] | None:
+        return self.schedule
+
+    def set_schedule(self, schedule: list[dict]) -> None:
+        self.schedule = schedule
+        self._save()
+
     def get_ids(self) -> dict[str, str]:
         return self.ids
 
@@ -126,6 +154,9 @@ class ConfigManager:
         # the codes produced by PdfTableExtractor (e.g. 45211 -> "045211").
         codes = df[self.KEY].astype("Int64").astype(str).str.zfill(6)
         self.ids = dict(zip(codes, df[self.PROGRAM_NAME]))
+
+        self.last_master_update = datetime.now().strftime("%d/%m/%Y")
+        self.last_master_filename = Path(path).name
 
         self._save()
 

@@ -1,8 +1,9 @@
 from flask import Flask
 
+from common.config_manager import ConfigManager
+from web.routes import register_routes
+
 app = Flask(__name__)
+app.config["config_manager"] = ConfigManager("./files/config.json")
 
-
-@app.route("/")
-def hello_world():
-    return "<p>Hello, World!</p>"
+register_routes(app)
