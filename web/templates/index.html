@@ -3,18 +3,28 @@
 {% block title %}moni{% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-center h-full">
-  <div class="text-center">
+<div class="flex items-center justify-center h-full" dir="rtl">
+  <div class="text-center w-full max-w-md px-4">
     <h1 class="text-4xl font-bold text-gray-800 mb-4">moni</h1>
-    <p class="text-gray-600 mb-6">Knesset committee report monitor</p>
-    <button
-      hx-get="/api/hello"
-      hx-target="#result"
-      class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 cursor-pointer"
-    >
-      Say Hello
-    </button>
-    <div id="result" class="mt-4 text-gray-700"></div>
+    <p class="text-gray-600 mb-8">Knesset committee report monitor</p>
+    <div class="space-y-3">
+      <button class="flex items-center gap-3 w-full px-6 py-4 bg-emerald-500 text-white rounded-lg shadow-sm hover:bg-emerald-600 cursor-pointer text-right" dir="ltr">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-white"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+        <span dir="rtl" class="flex-1">טקסט placeholder</span>
+      </button>
+      <button class="flex items-center gap-3 w-full px-6 py-4 bg-emerald-500 text-white rounded-lg shadow-sm hover:bg-emerald-600 cursor-pointer text-right" dir="ltr">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-white"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+        <span dir="rtl" class="flex-1">טקסט placeholder</span>
+      </button>
+      <button class="flex items-center gap-3 w-full px-6 py-4 bg-emerald-500 text-white rounded-lg shadow-sm hover:bg-emerald-600 cursor-pointer text-right" dir="ltr">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-white"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+        <span dir="rtl" class="flex-1">טקסט placeholder</span>
+      </button>
+      <button class="flex items-center gap-3 w-full px-6 py-4 bg-emerald-500 text-white rounded-lg shadow-sm hover:bg-emerald-600 cursor-pointer text-right" dir="ltr">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 text-white"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+        <span dir="rtl" class="flex-1">טקסט placeholder</span>
+      </button>
+    </div>
   </div>
 </div>
 {% endblock %}
