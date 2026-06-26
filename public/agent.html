@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BERL - העלאת סוכן</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="index.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="screen active agent-screen" data-page="agent">
+    <button class="back-btn" type="button" data-target="index.html">← חזרה</button>
+
+    <div class="logo agent-logo">
+      <img src="logo.png" alt="BERL">
+    </div>
+
+    <section class="section agent-section">
+      <div class="green-btn">
+        <span>העלאת סוכן</span>
+        <i class="fa-solid fa-calendar-days"></i>
+      </div>
+
+      <div class="date-area range-editor">
+        <input id="editingRangeIndex" type="hidden" value="">
+        <div class="row">
+          <label for="startDate">תאריך התחלה</label>
+          <input id="startDate" type="date">
+        </div>
+        <div class="row">
+          <label for="endDate">תאריך סיום</label>
+          <input id="endDate" type="date">
+        </div>
+      </div>
+
+      <div class="range-days" id="rangeDayEditor">
+        <div class="range-day" data-day-row="sun">
+          <label><input class="day-box" type="checkbox" data-day-enabled="sun"> א</label>
+          <input class="day-time" type="time" data-day-time="sun" value="08:00">
+        </div>
+        <div class="range-day" data-day-row="mon">
+          <label><input class="day-box" type="checkbox" data-day-enabled="mon"> ב</label>
+          <input class="day-time" type="time" data-day-time="mon" value="08:00">
+        </div>
+        <div class="range-day" data-day-row="tue">
+          <label><input class="day-box" type="checkbox" data-day-enabled="tue"> ג</label>
+          <input class="day-time" type="time" data-day-time="tue" value="08:00">
+        </div>
+        <div class="range-day" data-day-row="wed">
+          <label><input class="day-box" type="checkbox" data-day-enabled="wed"> ד</label>
+          <input class="day-time" type="time" data-day-time="wed" value="08:00">
+        </div>
+        <div class="range-day" data-day-row="thu">
+          <label><input class="day-box" type="checkbox" data-day-enabled="thu"> ה</label>
+          <input class="day-time" type="time" data-day-time="thu" value="08:00">
+        </div>
+        <div class="range-day" data-day-row="fri">
+          <label><input class="day-box" type="checkbox" data-day-enabled="fri"> ו</label>
+          <input class="day-time" type="time" data-day-time="fri" value="08:00">
+        </div>
+        <div class="range-day" data-day-row="sat">
+          <label><input class="day-box" type="checkbox" data-day-enabled="sat"> ש</label>
+          <input class="day-time" type="time" data-day-time="sat" value="08:00">
+        </div>
+      </div>
+
+      <div class="range-actions">
+        <button class="mailbox-submit" type="button" data-action="add-range">הוסף טווח</button>
+        <button class="secondary-btn" type="button" data-action="cancel-edit">בטל</button>
+      </div>
+
+      <div id="rangeList" class="range-list"></div>
+
+      <button class="mailbox-submit save-all-btn" type="button" data-action="save-schedule">שמור הכל</button>
+    </section>
+
+    <div id="pageStatus" class="page-status" role="status"></div>
+  </main>
+</body>
+</html>

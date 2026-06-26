@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BERL - רשימת תפוצה</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="index.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="screen active" data-page="mailing">
+    <button class="back-btn" type="button" data-target="index.html">← חזרה</button>
+
+    <div class="logo">
+      <img src="logo.png" class="logo" width="70%" alt="BERL">
+    </div>
+
+    <div class="mailing-content">
+      <div class="green-btn">
+        <span>עדכון רשימת תפוצה</span>
+        <span class="icon"><i class="fa-solid fa-users"></i></span>
+      </div>
+
+      <div class="mailing-card">
+        <div id="emailList" class="email-list">
+          <div class="empty-mailing">לא נוספו כתובות אימייל</div>
+        </div>
+
+        <div class="add-row">
+          <input id="newEmail" type="email" placeholder="הוספת אימייל">
+          <button class="plus" type="button" data-action="add-email" aria-label="הוסף אימייל">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+      </div>
+
+      <button class="mailbox-submit mailing-save" type="button" data-action="save-mailing-list">שמור</button>
+      <div id="pageStatus" class="page-status" role="status"></div>
+    </div>
+  </main>
+</body>
+</html>

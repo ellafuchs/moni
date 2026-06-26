@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BERL - העלאת קובץ</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="index.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="screen active" data-page="upload">
+    <button class="back-btn" type="button" data-target="index.html">← חזרה</button>
+    <div class="logo">
+      <img src="logo.png" class="logo" width="70%" alt="BERL">
+    </div>
+
+    <div class="upload-content">
+      <div class="green-btn">
+        <span>העלאת קובץ</span>
+        <span class="icon"><i class="fa-solid fa-arrow-up-from-bracket"></i></span>
+      </div>
+
+      <label for="excelUpload" class="upload-box">
+        <i class="fa-solid fa-file-excel"></i>
+        <span>בחר קובץ Excel</span>
+      </label>
+      <input type="file" id="excelUpload" hidden accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+
+      <p id="selectedFile" class="upload-file-name">קובץ עבור: לא נבחר קובץ</p>
+      <div class="upload-hint">אנא בחר קובץ Excel בלבד</div>
+      <button class="mailbox-submit" type="button" data-action="upload-file">העלה</button>
+      <div id="pageStatus" class="upload-status" role="status"></div>
+    </div>
+  </main>
+</body>
+</html>
