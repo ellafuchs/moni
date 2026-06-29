@@ -35,7 +35,7 @@ config = ConfigManager(CONFIG_PATH)
 
 # Make config
 config.load_master("./files/master.xlsx")
-config.set_mailing_list(["ellapomela@gmail.com"])
+config.set_mailing_list(["ronikorem93@gmail.com", "ellapomela@gmail.com", "hili.paryenti@gmail.com", "noa.macy@gmail.com"])
 config.set_notifier_email("excelberl@gmail.com")
 config.set_notifier_password("mzhm xnwo etwx gfej")
 
