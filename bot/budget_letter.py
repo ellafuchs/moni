@@ -42,6 +42,7 @@ class BudgetLetter:
     # The appendix table (נספח לדברי ההסבר) listing each program's multi-year
     # net-expenditure history; its page is found by this marker in the readable text.
     BUDGET_HISTORY_TITLE = "היסטוריה תקציבית של הפנייה - הוצאה נטו"
+    BUDGET_HISTORY_GENERIC = "היסטוריה תקציבית של הפנייה"  # when the metric is unknown
     BUDGET_HISTORY_MARKER = "היסטוריה תקציבית"
 
     def __init__(self, source: str):
@@ -196,20 +197,75 @@ class BudgetLetter:
         return list(seen.values())
 
     def extract_budget_history(self):
-        """Return the appendix 'היסטוריה תקציבית' table as a cleaned DataFrame.
+        """Return the appendix's budget-history tables as (title, DataFrame) pairs.
 
-        One row per program code, with the proposed change and the original/approved
-        net-expenditure figures across the recent budget years. Returns an empty
-        DataFrame if the letter has no such appendix.
+        The 'היסטוריה תקציבית' appendix holds one table per budget metric — e.g.
+        הוצאה נטו / הוצאה מותנית בהכנסה / הרשאה להתחייב — each introduced by its own
+        'היסטוריה תקציבית של הפנייה – <metric>' title line. The pairs come back in
+        document order (the k-th title goes with the k-th table on the appendix pages);
+        an empty list when the letter has no such appendix.
         """
-        import pandas as pd
-
+        titles: list[str] = []
+        raw: list = []
         for page in self.doc.pages:
             if self.BUDGET_HISTORY_MARKER not in page.text:
                 continue
-            if page.tables:
-                return self._clean_history_table(page.tables[0])
-        return pd.DataFrame()
+            titles += [t for t in map(self._history_title, page.text.splitlines()) if t]
+            raw += [t for t in page.tables if t]
+
+        # One metric = one table, even when it spills across pages: a continuation page
+        # either repeats the same header or (when pdfplumber drops it) starts on data.
+        # DIFFERENT metric tables have different headers, so they stay separate — this
+        # combines a table's own pages without ever fusing distinct metrics.
+        groups: list[list] = []
+        for table in raw:
+            header = self._is_header_row(table[0])
+            if groups and (not header or self._same_header(table[0], groups[-1][0])):
+                groups[-1] += table[1:] if header else table   # drop the repeated header
+            else:
+                groups.append(list(table))
+
+        out = []
+        for i, table in enumerate(groups):
+            if len(titles) == len(groups):
+                title = titles[i]                    # one metric title per table
+            elif len(groups) == 1 and titles:
+                title = titles[0]                    # single table with its own title
+            else:
+                title = self.BUDGET_HISTORY_GENERIC  # metric unknown — don't assert one
+            out.append((title, self._clean_history_table(table)))
+        return out
+
+    def _same_header(self, a, b) -> bool:
+        """True if two rows are the same header, ignoring the PDF's stray whitespace."""
+        squash = lambda row: [self._clean_name(c).replace(" ", "") for c in row]
+        return squash(a) == squash(b)
+
+    @staticmethod
+    def _is_header_row(row) -> bool:
+        """True if the row is a real header (has Hebrew label text), not a data row.
+
+        Header cells read like 'קוד תוכנית' / 'מקורי 2023'; data rows are codes and
+        amounts only. Lets a page whose title row pdfplumber missed render without a
+        data row masquerading as the header.
+        """
+        return any(re.search(r"[א-ת]", str(cell or "")) for cell in row)
+
+    @classmethod
+    def _history_title(cls, line: str) -> str | None:
+        """A budget-history title line ('...היסטוריה תקציבית... – <metric>') or None.
+
+        Only lines that name a metric after a dash qualify; the bare section header
+        ('היסטוריה תקציבית של הפנייה') has no metric and is skipped. Matching ignores
+        whitespace so the PDF's stray in-word spacing (e.g. 'תקציבי ת') still matches.
+        """
+        collapsed = " ".join(line.split())
+        if cls.BUDGET_HISTORY_MARKER.replace(" ", "") not in collapsed.replace(" ", ""):
+            return None
+        parts = re.split(r"[–—-]", collapsed, maxsplit=1)
+        if len(parts) == 2 and parts[1].strip():
+            return collapsed
+        return None
 
     def _clean_history_table(self, table):
         """Turn a raw budget-history table (header + data rows) into a clean DataFrame.
@@ -220,9 +276,32 @@ class BudgetLetter:
         """
         import pandas as pd
 
-        header, *data = table
-        columns = [self._clean_name(cell) for cell in header]
-        rows = [[(cell or "").strip() for cell in record] for record in data]
+        if self._is_header_row(table[0]):
+            header, *data = table
+            columns = [self._clean_name(cell) for cell in header]
+        else:
+            # A continuation page whose title row pdfplumber dropped: no header to show,
+            # so render every row as data under blank headings (never numbers-as-title).
+            columns = [""] * len(table[0])
+            data = table
+
+        # pdfplumber can return ragged rows (a row with more/fewer cells than the header),
+        # so pad columns/rows to a common width — otherwise the DataFrame build throws.
+        ncol = max([len(columns)] + [len(r) for r in data])
+        columns = (columns + [""] * ncol)[:ncol]
+
+        # Drop duplicate rows: a table split across pages repeats its seam rows on both
+        # pages, so the same program code can appear twice. Each code is unique here, so
+        # any exact repeat is that artifact — keep the first, preserve order.
+        rows, seen = [], set()
+        for record in data:
+            cleaned = [(cell or "").strip() for cell in record]
+            cleaned = (cleaned + [""] * ncol)[:ncol]
+            key = tuple(cleaned)
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(cleaned)
         return pd.DataFrame(rows, columns=columns)
 
     def extract_letterhead(self, lines: int = 3) -> list[str]:

@@ -57,11 +57,11 @@ def _extras(request: str) -> dict:
     from budget_letter import BudgetLetter
     print(f"building {request}_extras.json from {os.path.basename(pdf)} (one-time)...")
     letter = BudgetLetter(pdf)
-    history = letter.extract_budget_history()
     extras = {
         "letterhead": letter.extract_letterhead(),
-        "history": None if history is None or history.empty
-        else {"columns": list(history.columns), "data": history.values.tolist()},
+        # budget_history is now a list of (title, DataFrame) pairs — one per metric.
+        "history": [{"title": title, "columns": list(df.columns), "data": df.values.tolist()}
+                    for title, df in letter.extract_budget_history()],
     }
     json.dump(extras, open(cache, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     return extras
@@ -70,9 +70,8 @@ def _extras(request: str) -> dict:
 def render(request: str) -> str:
     golden = json.load(open(os.path.join(GOLDEN, f"{request}.json"), encoding="utf-8"))
     extras = _extras(request)
-    history = extras["history"]
-    budget_history = (pd.DataFrame(history["data"], columns=history["columns"])
-                      if history else None)
+    budget_history = [(h["title"], pd.DataFrame(h["data"], columns=h["columns"]))
+                      for h in (extras["history"] or [])]
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     out = os.path.join(OUTPUT_DIR, f"{request}_preview.pdf")

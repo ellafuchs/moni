@@ -25,7 +25,6 @@ class ConfigManager:
         self.last_master_update: str | None = None
         self.last_master_filename: str | None = None
         self.schedule: list[dict] | None = None
-        self.tally_csv_path: str | None = None
 
         self._load()
 
@@ -46,7 +45,6 @@ class ConfigManager:
         self.last_master_update = config.get("last_master_update")
         self.last_master_filename = config.get("last_master_filename")
         self.schedule = config.get("schedule")
-        self.tally_csv_path = config.get("tally_csv_path", "./files/outputs/program_tally.csv")
 
         self.ids = {}
         for program in config.get("programs"):
@@ -65,7 +63,6 @@ class ConfigManager:
             "last_master_update": self.last_master_update,
             "last_master_filename": self.last_master_filename,
             "schedule": self.schedule,
-            "tally_csv_path": self.tally_csv_path,
             "programs": [],
         }
 
@@ -133,13 +130,6 @@ class ConfigManager:
 
     def set_schedule(self, schedule: list[dict]) -> None:
         self.schedule = schedule
-        self._save()
-
-    def get_tally_csv_path(self) -> str | None:
-        return self.tally_csv_path
-
-    def set_tally_csv_path(self, tally_csv_path: str) -> None:
-        self.tally_csv_path = tally_csv_path
         self._save()
 
     def get_ids(self) -> dict[str, str]:

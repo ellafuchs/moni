@@ -190,8 +190,9 @@ class Reports:
 
         `fields` is the {field: value} dict, `table` the combined-table DataFrame,
         and `letterhead` the letterhead lines (see BudgetLetter.extract_letterhead).
-        `budget_history`, if a non-empty DataFrame, is rendered as a second table
-        (the 'היסטוריה תקציבית' appendix) below the budget table.
+        `budget_history` is a list of (title, DataFrame) pairs — the letter's
+        'היסטוריה תקציבית' appendix tables, one per metric — each rendered under its
+        title below the budget table (see BudgetLetter.extract_budget_history).
         `method` only tags the filename (summary.pdf -> summary_parse.pdf / _llm.pdf).
         `source_url`, if given, is printed as the PDF's provenance line.
         `llm_usage` (from BudgetLetter.last_llm_usage) prints the LLM token cost of the
@@ -228,7 +229,7 @@ class Reports:
         # column), de-duplicated by code, order preserved: in-master shown at the TOP,
         # the rest at the END (see below). Header text is pure Hebrew (no Latin word /
         # parentheses): bidi reorders parens/Latin inside an RTL line and mangles them.
-        in_master, not_in_master = self._split_programs_by_master(table, name_column)
+        in_master, _ = self._split_programs_by_master(table, name_column)
         # When the caller supplies the master's authoritative code->name mapping for the
         # programs that made this letter relevant, use it for the in-master block at the
         # top (the master's canonical names, not the letter's own wording).
@@ -326,22 +327,25 @@ class Reports:
         ] + spans))
         story.append(data_table)
 
-        # Appendix: the multi-year net-expenditure history, if the letter has one.
-        if budget_history is not None and not budget_history.empty:
-            head_style = ParagraphStyle(
-                "hist_head", fontName=font, fontSize=7, alignment=1, leading=9,  # center
-            )
+        # Appendix: the letter's budget-history tables — one per metric (הוצאה נטו /
+        # הוצאה מותנית בהכנסה / הרשאה להתחייב) — each under its own title, in the order
+        # they appear in the letter. See BudgetLetter.extract_budget_history.
+        head_style = ParagraphStyle(
+            "hist_head", fontName=font, fontSize=7, alignment=1, leading=9,  # center
+        )
+        for title, history in (budget_history or []):
+            if history is None or history.empty:
+                continue
             story.append(Spacer(1, 0.6 * cm))
-            story.append(Paragraph(
-                escape(self._rtl("היסטוריה תקציבית של הפנייה - הוצאה נטו")), title_style))
+            story.append(Paragraph(escape(self._rtl(title)), title_style))
             story.append(Spacer(1, 0.2 * cm))
 
             # Columns reversed for Hebrew reading order. Headers are wrapping,
             # bidi-reordered cells; the amounts/codes are left as plain text so
             # bidi doesn't disturb the digits or the leading minus sign.
-            hist_headers = list(budget_history.columns)[::-1]
+            hist_headers = list(history.columns)[::-1]
             hist_rows = [[self._cell(h, head_style) for h in hist_headers]]
-            for _, record in budget_history.iterrows():
+            for _, record in history.iterrows():
                 hist_rows.append([str(record[col]) for col in hist_headers])
 
             hist_table = Table(hist_rows, repeatRows=1)
@@ -402,12 +406,6 @@ class Reports:
             )
             story.append(Paragraph(
                 escape(self._rtl("חילוץ מבוסס-כללים — ללא עלות LLM")), note_style))
-
-        # ---- programs NOT in the master, at the very end, under everything ----
-        if not_in_master:
-            story.append(Spacer(1, 0.6 * cm))
-            title = f"{len(not_in_master)} תוכניות שאינן במאסטר"
-            story.extend(self._programs_table(title, not_in_master, title_style, font))
 
         output_path = str(Path(output_path))
         SimpleDocTemplate(
