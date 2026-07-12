@@ -1,0 +1,17 @@
+{
+  "request": "21634",
+  "source": "https://fs.knesset.gov.il/globaldocs/FINANCE/17d4808b-426e-f111-a13e-005056aa7c52/4_17d4808b-426e-f111-a13e-005056aa7c52_13_21634.pdf",
+  "method": "llm",
+  "text": {
+    "date": "",
+    "request_number": "",
+    "program_number": "",
+    "request_summary": "",
+    "request_breakdown": "",
+    "decision_links": "",
+    "coalition_funds": "",
+    "staffing_changes": ""
+  },
+  "table": [],
+  "expect_summary": true
+}

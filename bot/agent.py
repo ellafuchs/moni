@@ -1,0 +1,262 @@
+"""The single extraction agent — one class, all tools + the one LLM call.
+
+`Agent` owns ALL request-field extraction for a budget-transfer letter. Most fields are
+produced by deterministic methods over the FULL letter text (no truncation). A single LLM
+call over the narrative region does the two things that vary per letter: judging
+`coalition_funds` and finding where the narrative ends (so `request_summary` is sliced
+VERBATIM, no reflow). No deterministic fallback. `BudgetLetter` stays the document/table
+provider; this class is the whole agent.
+
+    agent = Agent(ConfigManager.read_master_programs("files/master.xlsx"), api_key=...)
+    result = agent.extract(source)   # source = URL or local PDF path
+    result.fields        # RequestFields
+    result.table         # budget table + a `master` (כן/לא) column
+    result.matched_codes # letter codes that are in the master set
+    result.relevant      # True iff a summary should be produced
+"""
+from __future__ import annotations
+
+import logging
+import re
+from dataclasses import dataclass
+
+import pandas as pd
+from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+
+from budget_letter import BudgetLetter
+from request_fields import RequestFields
+
+# Load OPENAI_API_KEY from .env even when imported standalone.
+load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+MASTER_COLUMN = "master"
+DEFAULT_MODEL = "gpt-4o"
+
+# Rough list price, USD per 1M tokens (input, output) — for the on-report cost estimate.
+PRICING_USD_PER_1M = {
+    "gpt-4o": (2.50, 10.00),
+    "gpt-4o-mini": (0.15, 0.60),
+}
+
+
+class _Analysis(BaseModel):
+    """The one LLM call's output: the coalition judgment + the narrative-end boundary
+    (so the summary can be sliced verbatim from the text — no reflow)."""
+    coalition_funds: str = Field(
+        description="'כן' if the letter actually USES/allocates coalition funds, or asks "
+                    "the committee to keep monitoring them going forward; else 'לא'. "
+                    "Merely mentioning coalition is not enough.")
+    request_summary: str = Field(
+        description="Return the COMPLETE request text VERBATIM — this is NOT a summary. "
+                    "Include the opening paragraph and, for EACH program, its "
+                    "'NNNNNN: <שם> – <סכום>' line with its full 'תיאור התוכנית' and "
+                    "'מטרת השינוי'. Copy every word exactly; do NOT summarize, shorten, "
+                    "rephrase or omit any narrative sentence. The ONLY things to leave out "
+                    "are non-prose artifacts: tables / number lists (e.g. the coalition "
+                    "totals table ending in 'סה\"כ'), the links section, and the sign-off.")
+
+
+@dataclass
+class Extraction:
+    """The agent's result for one letter."""
+    fields: RequestFields
+    table: pd.DataFrame        # budget table + a `master` (כן/לא) column
+    matched_codes: set[str]    # letter codes that are in the master set
+    relevant: bool             # a summary is produced iff this is True
+    letter: BudgetLetter       # kept for rendering (letterhead, history, original PDF)
+    llm_usage: dict | None = None   # token counts + cost of the one coalition call
+
+
+class Agent:
+    """The single extraction agent: deterministic tools + one coalition LLM call."""
+
+    _ANALYSIS_SYSTEM = (
+        "לפניך הטקסט הנרטיבי של פנייה תקציבית (מהכותרת 'עיקרי הפנייה'). בצע שתי משימות:\n"
+        "1) coalition_funds: קבע 'כן' אם הפנייה עושה שימוש בפועל בכספים קואליציוניים, "
+        "או מבקשת מהוועדה להמשיך ולעקוב אחריהם; אחרת 'לא'. רק אזכור של קואליציה, או "
+        "'אינה כוללת כספים קואליציוניים', הם 'לא'. המשפט הכללי 'האם יש התייחסות לכספים "
+        "קואליציונים' לבדו אינו מספיק.\n"
+        "2) request_summary: החזר את הנרטיב של הפנייה כטקסט עברי רציף ונקי — פסקת הפתיחה, "
+        "ולכל תכנית את שורת 'NNNNNN: <שם> – <סכום>', 'תיאור התוכנית' ו'מטרת השינוי'. "
+        "העתק את הניסוח בנאמנות; אל תמציא, אל תקצר ואל תנסח מחדש. אל תכלול טבלאות ורשימות "
+        "מספרים (למשל טבלת סיכום קואליציונית המסתיימת ב'סה\"כ'), את מקטע הקישורים ואת החתימה."
+    )
+
+    def __init__(self, master_programs, *, api_key=None, model=None, provider=None):
+        self.master = set(master_programs)
+        self.api_key = api_key
+        self.model = model or DEFAULT_MODEL
+        self.provider = provider
+
+    @classmethod
+    def from_config(cls, config, master_path: str) -> "Agent":
+        """Build an Agent from a ConfigManager and the master.xlsx path.
+
+        Pulls the master code set and the LLM settings from config, so callers don't
+        hand-plumb them. The plain constructor stays for tests (no config needed).
+        """
+        return cls(
+            config.read_master_programs(master_path),
+            api_key=config.get_api_key(),
+            model=config.get_model_name(),
+            provider=config.get_model_provider(),
+        )
+
+    # ------------------------------------------------------------------ entry
+    def extract(self, source: str) -> Extraction:
+        """Extract one letter (URL or local path) into fields + table + relevance."""
+        letter = BudgetLetter(source)
+        text = letter.doc.text
+
+        region = self._narrative_region(text)
+        # The ONE LLM call: coalition judgment + the full request text (not a summary).
+        coalition, summary, usage = self._analyze(region)
+        fields = RequestFields(
+            date=self._date(text),
+            request_number=self._request_number(text),
+            program_number=self._program_number(summary),
+            request_summary=summary,
+            decision_links=self._decision_links(letter),
+            staffing_changes=self._staffing(text),
+            coalition_funds=coalition,
+        )
+
+        table, matched = self._table(letter)
+        return Extraction(fields, table, matched, bool(matched), letter, usage)
+
+    # --------------------------------------------------- deterministic tools
+    @staticmethod
+    def _date(text: str) -> str:
+        """The request date from the table pages ("תאריך הבקשה: DD/MM/YYYY")."""
+        m = re.search(r"תאריך הבקשה\s*:?\s*(\d{1,4}[./]\d{1,2}[./]\d{2,4})", text)
+        return m.group(1) if m else ""
+
+    def _request_number(self, text: str) -> str:
+        """The 'בקשה מספר NN-NNN' numbers + the committee number, canonicalized."""
+        numbers = list(dict.fromkeys(
+            m.replace(" ", "")
+            for m in re.findall(r"בקשה מספר\s*(\d{2,3}\s*-\s*\d{2,3})", text)
+        ))
+        committee = re.search(r"מספר פני\S* לועדה\s*:?\s*([^\n]+)", text)
+        parts = []
+        if numbers:
+            parts.append(", ".join(numbers))
+        if committee:
+            parts.append(f"מספר פנייה לועדה: {committee.group(1).strip()}")
+        return self._canonical_request_numbers(" | ".join(parts))
+
+    @staticmethod
+    def _narrative_region(text: str) -> str:
+        """The narrative text (verbatim), from AFTER 'עיקרי הפנייה:' up to the budget-table
+        pages — a bounded window the LLM inspects for the exact end boundary. The heading
+        itself is excluded (the report's field label supplies it), so it isn't doubled."""
+        m = re.search(r"עיקרי הפנייה\s*:", text)
+        if not m:
+            return ""
+        # The table pages begin at 'תאריך הבקשה'; the narrative ends before them.
+        table_start = text.find("תאריך הבקשה", m.end())
+        end = table_start if table_start != -1 else min(len(text), m.start() + 16000)
+        return text[m.end():end].strip()
+
+    @staticmethod
+    def _program_number(scope: str) -> str:
+        """Program codes named as 'NNNNNN:' in the given text, in order, de-duplicated."""
+        codes = re.findall(r"תו?כנית\s*:?\s*(\d{5,6})", scope)
+        codes += re.findall(r"(?m)^\s*(\d{5,6})\s*:", scope)
+        return ", ".join(dict.fromkeys(codes))
+
+    @staticmethod
+    def _staffing(text: str) -> str:
+        """'כן'/'לא' from the labeled statement 'השפעה על כוח אדם:' (or an explicit
+        'שינוי בכוח אדם'); absence defaults to 'לא'."""
+        m = re.search(r"השפעה על כוח אדם\s*:?\s*(\S+)", text)
+        if m:
+            value = m.group(1)
+            if any(neg in value for neg in ("אין", "אינם", "ללא")):
+                return "לא"
+            return "כן"
+        return "כן" if re.search(r"שינוי\S* בכוח אדם", text) else "לא"
+
+    @staticmethod
+    def _decision_links(letter: BudgetLetter) -> str:
+        """Government-decision links, from the raw (LTR) text via BudgetLetter."""
+        links = letter._decision_links()
+        return "\n".join(f"{i}. {url}" for i, url in enumerate(links, 1))
+
+    @staticmethod
+    def _section(text: str, start: str, ends: list[str],
+                 *, include_start: bool = False) -> str:
+        """Text between `start` (a regex) and the earliest following `ends` marker."""
+        m = re.search(start, text)
+        if m is None:
+            return ""
+        i = m.start() if include_start else m.end()
+        stop = len(text)
+        for end in ends:
+            j = text.find(end, m.end())
+            if j != -1:
+                stop = min(stop, j)
+        return text[i:stop].strip()
+
+    @staticmethod
+    def _canonical_request_numbers(value: str) -> str:
+        """Order every hyphenated request number as NN-NNN (2-digit group first)."""
+        def fix(m: re.Match) -> str:
+            a, b = m.group(1), m.group(2)
+            return f"{b}-{a}" if len(a) == 3 and len(b) == 2 else f"{a}-{b}"
+        return re.sub(r"(\d{2,3})-(\d{2,3})", fix, value)
+
+    # ------------------------------------------------------- the one LLM call
+    def _analyze(self, region: str):
+        """The ONE LLM call over the narrative region — NO fallback.
+
+        Returns (coalition 'כן'/'לא', narrative_end phrase, usage dict). An empty region
+        (no narrative) is ('לא', '', None) with no call. Otherwise the model returns the
+        coalition judgment and where the narrative ends; if the model is unavailable the
+        error surfaces — it is not masked by a deterministic answer.
+        """
+        if not region:
+            return "לא", "", None
+
+        from langchain.chat_models import init_chat_model
+
+        params: dict = {"temperature": 0, "max_retries": 3}
+        if self.api_key:
+            params["api_key"] = self.api_key
+        if self.provider:
+            params["model_provider"] = self.provider
+        llm = init_chat_model(self.model, **params).with_structured_output(
+            _Analysis, include_raw=True)
+        result = llm.invoke([("system", self._ANALYSIS_SYSTEM), ("user", region)])
+        parsed = result["parsed"]
+        coalition = "כן" if "כן" in (parsed.coalition_funds or "").strip() else "לא"
+        return coalition, (parsed.request_summary or "").strip(), self._usage(result.get("raw"))
+
+    def _usage(self, raw) -> dict:
+        """Token counts + a rough USD cost estimate from the raw AIMessage."""
+        meta = getattr(raw, "usage_metadata", None) or {}
+        in_tok = meta.get("input_tokens", 0)
+        out_tok = meta.get("output_tokens", 0)
+        rate = PRICING_USD_PER_1M.get(self.model)
+        cost = (in_tok * rate[0] + out_tok * rate[1]) / 1_000_000 if rate else None
+        return {"model": self.model, "input_tokens": in_tok,
+                "output_tokens": out_tok, "cost_usd": cost}
+
+    # ------------------------------------------------------- table + master
+    def _table(self, letter: BudgetLetter):
+        """The combined budget table + a `master` column and the matched codes."""
+        table = letter.extract_combined_table().copy()
+        table[MASTER_COLUMN] = [
+            "כן" if self._normalize(c) in self.master else "לא"
+            for c in table[letter.CODE_COLUMN]
+        ]
+        matched = {self._normalize(c) for c in table[letter.CODE_COLUMN]} & self.master
+        return table, matched
+
+    @staticmethod
+    def _normalize(code) -> str:
+        """A program code as a zero-padded 6-digit string (matches the master set)."""
+        return str(code).strip().zfill(6)
