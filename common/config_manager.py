@@ -18,6 +18,7 @@ class ConfigManager:
         self.ids: dict[str, str] = {}
         self.api_key: str | None = None
         self.model_name: str | None = None
+        self.model_provider: str | None = None
         self.mailing_list: list[str] | None = None
         self.notifier_email: str | None = None
         self.notifier_password: str | None = None
@@ -37,6 +38,7 @@ class ConfigManager:
 
         self.api_key = config.get("api_key")
         self.model_name = config.get("model_name")
+        self.model_provider = config.get("model_provider")
         self.mailing_list = list(config.get("mailing_list"))
         self.notifier_email = config.get("notifier").get("email")
         self.notifier_password = config.get("notifier").get("password")
@@ -52,6 +54,7 @@ class ConfigManager:
         config = {
             "api_key": self.api_key,
             "model_name": self.model_name,
+            "model_provider": self.model_provider,
             "mailing_list": self.mailing_list,
             "notifier": {
                 "email": self.notifier_email,
@@ -81,6 +84,13 @@ class ConfigManager:
 
     def set_model_name(self, model_name: str) -> None:
         self.model_name = model_name
+        self._save()
+
+    def get_model_provider(self) -> str | None:
+        return self.model_provider
+
+    def set_model_provider(self, model_provider: str) -> None:
+        self.model_provider = model_provider
         self._save()
 
     def get_mailing_list(self) -> list[str] | None:
@@ -125,39 +135,51 @@ class ConfigManager:
     def get_ids(self) -> dict[str, str]:
         return self.ids
 
-    def load_master(self, path: str) -> None:
-        """
-        Load program ids from master_xlsx_path and store them in the config gile.
+    @staticmethod
+    def read_master_programs(path: str) -> dict[str, str]:
+        """Read the Master תוכניות sheet -> {normalized 6-digit code: program name}.
+
+        Read-only: does not touch or save config. Codes come from Excel as ints and are
+        zero-padded to 6-digit strings so they match the codes BudgetLetter produces
+        (e.g. 45211 -> "045211"). This is the full Master code set (FR-4) used by the
+        relevance gate and the table's `master` column.
 
         Raises:
-            FileNotFoundError: if master_xlsx_path does not exist.
+            FileNotFoundError: if `path` does not exist.
             ValueError: if the programs sheet or expected columns are missing.
         """
-
         if not Path(path).is_file():
             raise FileNotFoundError(f"master xlsx not found: {path}")
 
         try:
-            df = pd.read_excel(path, sheet_name=self.PROGRAMS_SHEET)
+            df = pd.read_excel(path, sheet_name=ConfigManager.PROGRAMS_SHEET)
         except ValueError as e:
             raise ValueError(
-                f"sheet '{self.PROGRAMS_SHEET}' not found in master file"
+                f"sheet '{ConfigManager.PROGRAMS_SHEET}' not found in master file"
             ) from e
 
-        missing = {self.KEY, self.PROGRAM_NAME} - set(df.columns)
+        missing = {ConfigManager.KEY, ConfigManager.PROGRAM_NAME} - set(df.columns)
         if missing:
             raise ValueError(
-                f"missing expected columns {missing} in sheet '{self.PROGRAMS_SHEET}'"
+                f"missing expected columns {missing} in sheet "
+                f"'{ConfigManager.PROGRAMS_SHEET}'"
             )
 
-        # Codes come from Excel as ints; zero-pad to 6-digit strings so they match
-        # the codes produced by PdfTableExtractor (e.g. 45211 -> "045211").
-        codes = df[self.KEY].astype("Int64").astype(str).str.zfill(6)
-        self.ids = dict(zip(codes, df[self.PROGRAM_NAME]))
+        codes = df[ConfigManager.KEY].astype("Int64").astype(str).str.zfill(6)
+        return dict(zip(codes, df[ConfigManager.PROGRAM_NAME]))
 
+    def load_master(self, path: str) -> None:
+        """Load program ids from the master file into config and save.
+
+        Delegates the read/normalize to read_master_programs (FR-4), then persists.
+
+        Raises:
+            FileNotFoundError: if `path` does not exist.
+            ValueError: if the programs sheet or expected columns are missing.
+        """
+        self.ids = ConfigManager.read_master_programs(path)
         self.last_master_update = datetime.now().strftime("%d/%m/%Y")
         self.last_master_filename = Path(path).name
-
         self._save()
 
 

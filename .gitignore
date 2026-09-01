@@ -1,19 +1,17 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Environment variables
 .env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+output/
+config.json
 
-# Virtual environments
-.venv
+# Local runtime data, generated output, and secrets (files/config.json holds credentials)
+files/
 
-# Binaries
-/bin
-
-# Test files
-/files
+# Local agent/skill tooling and scratch notes
+.claude/
+.agents/
+skills-lock.json
+docs/superpowers/
