@@ -111,7 +111,7 @@ table.hist td{white-space:nowrap;text-align:center}
 </tbody></table></div>
 {% endif %}
 
-{% if intro or programs %}
+{% if intro_lines or programs %}
 <h3>עיקרי הפנייה</h3>
 {% for line in intro_lines %}<p>{{ line | bold_labels }}</p>
 {% endfor %}
