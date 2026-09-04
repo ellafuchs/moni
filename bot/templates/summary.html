@@ -4,70 +4,53 @@
 <meta charset="utf-8">
 <title>סיכום פנייה תקציבית {{ request_id }}</title>
 <style>
+/* Formal report look: navy title band, bordered tables with a light-blue header row,
+   one green for "in the master", green/red for the change amounts. Colours are Excel-like
+   so the page prints the way a ministry report does. */
 :root{
-  --paper:#F7F8FA; --card:#FFFFFF; --ink:#1B2430; --muted:#5B6470; --faint:#8C95A1; --rule:#D8DDE3; --rule-strong:#B9C1CB;
-  --accent:#1F4E8C; --accent-soft:#E7EEF8;
-  --ok:#1B7A57; --ok-bg:#D3EDDD; --ok-row:#D9F0E3; --warn:#8A5A0B; --warn-bg:#FBEFD6; --neu-bg:#EEF1F5; --head-bg:#F1F4F8;
+  --ink:#1A1A1A; --muted:#3F4A5A; --faint:#6B7280; --rule:#B8C2D0; --rule-strong:#8A96A8;
+  --navy:#1F3864; --navy-soft:#DCE6F1; --panel:#F3F6FA;
+  --ok:#375623; --ok-bg:#E2F0D9; --warn:#7F6000; --neg:#C00000;
 }
-@page{ size:A4; margin:16mm 14mm; }
+@page{ size:A4; margin:14mm 14mm 16mm; }
 html{direction:rtl}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,"Arial Unicode MS",Helvetica,sans-serif;font-size:13px;line-height:1.6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.page{max-width:900px;margin:0 auto;background:var(--card);padding:28px 32px}
-@media print{ .page{max-width:none;padding:0;background:transparent} body{background:transparent} }
+body{margin:0;background:#fff;color:var(--ink);font-family:Arial,"Arial Unicode MS",Helvetica,sans-serif;font-size:12.5px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{max-width:900px;margin:0 auto;padding:24px 28px}
+@media print{ .page{max-width:none;padding:0} }
 h1,h3{margin:0;font-weight:700}
-h1{font-size:24px;line-height:1.25}
-h3{font-size:16px;margin:22px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--accent-soft);color:var(--accent);break-after:avoid}
 .num{font-variant-numeric:tabular-nums}
-.title{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
-.stamp{font-size:11px;color:var(--faint)}
-.sub{color:var(--muted);font-size:12px;margin-top:2px}
-.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px 32px;padding:12px 0;margin:12px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
-.meta .k{display:block;font-size:11px;color:var(--muted)}
-.meta .v{font-size:13.5px}
-.meta .wide{grid-column:1 / -1}
+.title{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;background:var(--navy);color:#fff;padding:12px 16px;margin-bottom:6px}
+.title h1{font-size:20px;color:#fff} .stamp{font-size:11px;color:#C9D6EA}
+.sub{color:var(--muted);font-size:12px;margin:0 0 6px}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;padding:8px 0;margin:8px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.meta .k{display:block;font-size:11px;color:var(--muted)} .meta .v{font-weight:700} .meta .wide{grid-column:1 / -1}
 .meta .ltr{direction:ltr;unicode-bidi:isolate;display:inline-block;text-align:left}
-.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0 6px;break-inside:avoid}
-.fact{border-radius:6px;padding:10px 14px;border-right:4px solid transparent}
-.fact.ok{border-right-color:var(--ok)} .fact.warn{border-right-color:var(--warn)} .fact.neu,.fact.no{border-right-color:var(--rule-strong)}
-.fact .k{font-size:11px;opacity:.85}
-.fact .v{font-size:20px;font-weight:700;margin:2px 0}
-.fact .why{font-size:11.5px;line-height:1.4}
-.fact.ok{background:var(--ok-bg);color:var(--ok)}
-.fact.warn{background:var(--warn-bg);color:var(--warn)}
-.fact.neu{background:var(--neu-bg);color:var(--muted)}
-.fact.no{background:var(--neu-bg);color:var(--muted)}
-table{border-collapse:collapse;width:100%;font-size:12px}
-thead{display:table-header-group}
-tr{break-inside:avoid}
-th,td{border-bottom:1px solid var(--rule);padding:5px 8px;text-align:right;vertical-align:top}
-th{color:var(--muted);font-weight:400;font-size:11px;border-bottom:1px solid var(--rule-strong);white-space:nowrap;background:var(--head-bg)}
-/* The letter's appendix tables run LEFT to right (code column first on the left),
-   unlike the budget table; keep that orientation so the page reads like the letter. */
+.facts{display:grid;grid-template-columns:repeat(3,1fr);margin:12px 0;border:1px solid var(--navy);background:var(--panel);break-inside:avoid}
+.fact{padding:8px 12px;border-left:1px solid var(--rule)} .fact:last-child{border-left:0}
+.fact .k{font-size:11px;font-weight:700;color:var(--navy)} .fact .v{font-size:16px;font-weight:700;margin:2px 0} .fact .why{font-size:11px;color:var(--muted);line-height:1.4}
+.fact.ok .v{color:var(--ok)} .fact.warn .v{color:var(--warn)}
+h3{font-size:14px;color:var(--navy);border-bottom:2px solid var(--navy);padding-bottom:2px;margin:20px 0 6px;break-after:avoid}
+table{border-collapse:collapse;width:100%;font-size:11.5px;border:1px solid var(--rule-strong)}
+thead{display:table-header-group} tr{break-inside:avoid}
+th,td{border:1px solid var(--rule);padding:4px 6px;text-align:right;vertical-align:top}
+th{background:var(--navy-soft);color:var(--navy);font-weight:700;white-space:nowrap}
+td.n,th.n{text-align:left;direction:ltr;white-space:nowrap} td.code{white-space:nowrap}
+tr.m td{background:var(--ok-bg)} tr.m td:first-child{font-weight:700}
+.pos{color:var(--ok)} .neg{color:var(--neg)}
+/* The letter's appendix tables run left to right (code column first on the left). */
 table.hist{font-size:10.5px;table-layout:auto;direction:ltr}
 table.hist th{white-space:normal;line-height:1.25;vertical-align:bottom;max-width:9em;direction:rtl;text-align:center}
 table.hist td{white-space:nowrap;text-align:center}
 .legend{font-size:11px;color:var(--muted);margin:2px 0 8px}
 .legend .sw{display:inline-block;width:10px;height:10px;background:var(--ok-bg);border:1px solid var(--ok);vertical-align:middle;margin-left:4px}
-td.n,th.n{text-align:left;direction:ltr;white-space:nowrap}
-tr.m td{background:var(--ok-row)}
-tr.m td:first-child{box-shadow:inset -4px 0 0 var(--ok)}
-tbody tr:not(.m):nth-child(even) td{background:#FAFBFC}
-td.code{white-space:nowrap}
-.prog{margin:10px 0 0;padding:9px 13px;border-right:3px solid var(--rule-strong);background:var(--paper);break-inside:avoid;border-radius:0 4px 4px 0}
-.prog.m{border-right-color:var(--ok);background:#E9F6EF}
-.prog .h{font-weight:700;font-size:14px;margin-bottom:3px}
-.prog p{margin:3px 0}
-.lbl{font-weight:700}
-.tag{display:inline-block;font-size:10.5px;padding:0 8px;border-radius:999px;background:var(--ok-bg);color:var(--ok);margin-right:8px;vertical-align:middle;font-weight:400}
-.links{direction:ltr;text-align:left;padding-left:22px;margin:6px 0;font-size:12px}
-.links li{margin:2px 0}
-.links a{color:var(--accent)}
-.note{color:var(--muted);font-size:11.5px;margin:2px 0 8px}
-.foot{display:grid;gap:4px;margin-top:22px;padding-top:8px;border-top:1px solid var(--rule);font-size:11px;color:var(--faint)}
-.foot a{word-break:break-all}
-.foot a{color:var(--accent)}
-.tbl{overflow-x:auto}
-@media print{ .tbl{overflow:visible} }
+.prog{margin:8px 0 0;padding:8px 12px;border:1px solid var(--rule);border-right:4px solid var(--rule);background:#fff;break-inside:avoid}
+.prog.m{border-right-color:var(--ok);background:#F7FBF4}
+.prog .h{font-weight:700;font-size:13.5px;margin-bottom:3px} .prog p{margin:3px 0} .lbl{font-weight:700}
+.tag{display:inline-block;font-size:10px;padding:0 6px;border-radius:2px;background:var(--ok-bg);color:var(--ok);margin-right:8px;vertical-align:middle}
+.links{direction:ltr;text-align:left;padding-left:22px;margin:6px 0;font-size:12px} .links li{margin:2px 0} .links a{color:var(--navy)}
+.foot{display:grid;gap:4px;margin-top:20px;padding-top:8px;border-top:1px solid var(--rule-strong);font-size:11px;color:var(--muted)}
+.foot a{color:var(--navy);word-break:break-all}
+.tbl{overflow-x:auto} @media print{ .tbl{overflow:visible} }
 </style>
 </head>
 <body>
@@ -108,7 +91,7 @@ td.code{white-space:nowrap}
 <div class="tbl"><table>
 <thead><tr><th>קוד</th><th>שם התוכנית</th><th class="n">שינוי, אלפי ש"ח</th></tr></thead>
 <tbody>
-{% for r in master_rows %}<tr class="m"><td class="code num">{{ r.code }}</td><td>{{ r.name }}</td><td class="n num"><b>{{ r.delta }}</b></td></tr>
+{% for r in master_rows %}<tr class="m"><td class="code num">{{ r.code }}</td><td>{{ r.name }}</td><td class="n num"><b class="{{ r.delta_class }}">{{ r.delta }}</b></td></tr>
 {% endfor %}
 </tbody></table></div>
 {% endif %}
@@ -153,7 +136,7 @@ td.code{white-space:nowrap}
 <thead><tr><th>מספר פרט</th><th>שם הפרט</th><th></th>{% for m in metrics %}<th class="n">{{ m }}</th>{% endfor %}<th class="n">שינוי</th><th>master</th></tr></thead>
 <tbody>
 {% for r in table_rows %}
-<tr class="{{ 'm' if r.in_master else '' }}"><td class="code num" rowspan="2">{{ r.code }}</td><td rowspan="2">{{ r.name }}</td><td>מ-</td>{% for v in r.from_values %}<td class="n num">{{ v }}</td>{% endfor %}<td class="n num" rowspan="2"><b>{{ r.delta }}</b></td><td rowspan="2">{{ r.master }}</td></tr>
+<tr class="{{ 'm' if r.in_master else '' }}"><td class="code num" rowspan="2">{{ r.code }}</td><td rowspan="2">{{ r.name }}</td><td>מ-</td>{% for v in r.from_values %}<td class="n num">{{ v }}</td>{% endfor %}<td class="n num" rowspan="2"><b class="{{ r.delta_class }}">{{ r.delta }}</b></td><td rowspan="2">{{ r.master }}</td></tr>
 <tr class="{{ 'm' if r.in_master else '' }}"><td>ל-</td>{% for v in r.to_values %}<td class="n num">{{ v }}</td>{% endfor %}</tr>
 {% endfor %}
 </tbody></table></div>

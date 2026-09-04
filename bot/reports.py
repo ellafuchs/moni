@@ -143,6 +143,13 @@ class Reports:
         s = f"{abs(value):,.0f}"
         return f"−{s}" if value < 0 else (f"+{s}" if value > 0 else "0")
 
+    @staticmethod
+    def _delta_class(value) -> str:
+        """CSS class for a change amount: green for increases, red for cuts."""
+        if value is None:
+            return ""
+        return "pos" if value > 0 else ("neg" if value < 0 else "")
+
     def _table_rows(self, table, name_column: str):
         """Rows for the budget table + {code: (name, total delta)} for master rows."""
         import pandas as pd
@@ -165,6 +172,7 @@ class Reports:
                 "from_values": [self._fmt(rec.get(f"{m} from")) for m in metrics],
                 "to_values": [self._fmt(rec.get(f"{m} to")) for m in metrics],
                 "delta": self._signed(delta) if delta is not None else "",
+                "delta_class": self._delta_class(delta),
             })
             if in_master:
                 master_totals[code] = master_totals.get(code, 0.0) + (delta or 0.0)
@@ -200,7 +208,8 @@ class Reports:
             candidates = [master_names.get(code, ""), (relevant_programs or {}).get(code, ""),
                           seen_names.get(code, "")]
             name = max((c.strip() for c in candidates if c), key=len, default="")
-            master_rows.append({"code": code, "name": name, "delta": self._signed(total)})
+            master_rows.append({"code": code, "name": name, "delta": self._signed(total),
+                                "delta_class": self._delta_class(total)})
         master_rows.sort(key=lambda r: -abs(float(r["delta"].replace(",", "").replace("−", "-").replace("+", "") or 0)))
 
         intro, programs = split_programs(fields.get("עיקרי הפנייה", ""))
