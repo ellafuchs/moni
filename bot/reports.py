@@ -65,8 +65,40 @@ _SPLIT_LETTER = re.compile(r"(\S) ([\u0590-\u05ea])(?=\s|$)")
 
 
 def join_split_letters(text: str) -> str:
-    """Re-join a final Hebrew letter the PDF reader split off: 'נט ו' -> 'נטו'."""
-    return _SPLIT_LETTER.sub(r"\1\2", str(text or ""))
+    """Re-join a final Hebrew letter the PDF reader split off: 'נט ו' -> 'נטו'.
+
+    A lone 'ו' after a number ('2856 ו 2857') is the conjunction, not a split letter,
+    and is left alone; 'ש" ח' -> 'ש"ח' and 'התרבו ת' -> 'התרבות' are joined."""
+    def fix(m):
+        prev, letter = m.group(1), m.group(2)
+        if letter == "ו" and prev.isdigit():
+            return m.group(0)
+        return prev + letter
+    return _SPLIT_LETTER.sub(fix, str(text or ""))
+
+
+_HISTORY_NUMBER = re.compile(r"^\s*(-?)([\d,]+)(-?)\s*$")
+
+
+def format_history_cell(value) -> str:
+    """'12,900-' or '-12,900' -> '−12,900'; '1,703,020' unchanged; other text as is."""
+    text = str(value if value is not None else "").strip()
+    m = _HISTORY_NUMBER.match(text)
+    if not m or not m.group(2).replace(",", "").isdigit():
+        return text
+    negative = bool(m.group(1) or m.group(3))
+    try:
+        number = int(m.group(2).replace(",", ""))
+    except ValueError:
+        return text
+    return f"−{number:,}" if negative and number else f"{number:,}"
+
+
+def clean_header(text) -> str:
+    """History headers copied from the letter: rejoin split letters, fix 'ב2025-' -> 'ב-2025'."""
+    text = join_split_letters(text)
+    text = re.sub(r"ב(\d{4})-", r"ב-\1", text)
+    return re.sub(r"ב-\s+(\d{4})", r"ב-\1", text)
 
 
 def _as_field_dict(fields) -> dict:
@@ -77,6 +109,15 @@ def _as_field_dict(fields) -> dict:
 
 
 _NUMBER = re.compile(r"(?<![\w.])(\d{1,3}(?:,\d{3})+|\d{5,6})(?![\w.,])")
+
+
+_LABEL = re.compile(r"^(תיאור הת[ו]?כנית|מטרת השינוי(?: התקציבי)?|השפעה על כוח אדם)\s*:")
+
+
+def bold_labels(text) -> Markup:
+    """bold_numbers + a bold section label when the line starts with one."""
+    safe = str(bold_numbers(text))
+    return Markup(_LABEL.sub(lambda m: f"<b>{m.group(0)}</b>", safe, count=1))
 
 
 def bold_numbers(text) -> Markup:
@@ -100,6 +141,7 @@ class Reports:
             trim_blocks=True, lstrip_blocks=True,
         )
         self.env.filters["bold_numbers"] = bold_numbers
+        self.env.filters["bold_labels"] = bold_labels
 
     # ---- data shaping ---------------------------------------------------
 
@@ -169,15 +211,22 @@ class Reports:
 
         master_rows = []
         for code, total in master_totals.items():
-            name = (master_names.get(code) or (relevant_programs or {}).get(code)
-                    or seen_names.get(code) or "")
+            # The master workbook's names are often truncated ("טיפול חוץ ביתי לאזרחים"),
+            # the letter's table has the full ones — take the longest of what we have.
+            candidates = [master_names.get(code, ""), (relevant_programs or {}).get(code, ""),
+                          seen_names.get(code, "")]
+            name = max((c.strip() for c in candidates if c), key=len, default="")
             master_rows.append({"code": code, "name": name, "delta": self._signed(total)})
         master_rows.sort(key=lambda r: -abs(float(r["delta"].replace(",", "").replace("−", "-").replace("+", "") or 0)))
 
         intro, programs = split_programs(fields.get("עיקרי הפנייה", ""))
+        intro_lines = [join_split_letters(line) for line in intro.split("\n") if line.strip()]
         program_blocks = [{
-            "code": p.code, "heading": p.heading, "description": p.description,
-            "purpose": p.purpose, "other": p.other, "in_master": p.code in matched,
+            "code": p.code, "heading": join_split_letters(p.heading),
+            "description": join_split_letters(p.description),
+            "purpose": join_split_letters(p.purpose),
+            "other": [join_split_letters(o) for o in p.other],
+            "in_master": p.code in matched,
         } for p in programs]
 
         links = re.findall(r"https?://\S+", fields.get(self.DECISION_LINKS_FIELD, "") or "")
@@ -188,12 +237,12 @@ class Reports:
         for title, df in (budget_history or []):
             if df is None or getattr(df, "empty", True):
                 continue
-            columns = [join_split_letters(c) for c in df.columns]
+            columns = [clean_header(c) for c in df.columns]
             rows = []
             for _, rec in df.iterrows():
-                cells = [str(rec[c]) for c in df.columns]
+                cells = [format_history_cell(rec[c]) for c in df.columns]
                 rows.append({"cells": cells, "in_master": cells[0].strip() in matched})
-            history.append({"title": join_split_letters(title), "columns": columns, "rows": rows})
+            history.append({"title": clean_header(title), "columns": columns, "rows": rows})
 
         usage = None
         if llm_usage:
@@ -213,7 +262,7 @@ class Reports:
             "coalition_reason": coalition_reason or "",
             "staffing": fields.get("שינויים בכוח אדם", ""),
             "master_rows": master_rows,
-            "intro": intro, "programs": program_blocks,
+            "intro_lines": intro_lines, "programs": program_blocks,
             "links": links,
             "metrics": metrics, "table_rows": table_rows,
             "history": history,

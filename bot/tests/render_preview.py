@@ -24,10 +24,12 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, "bot"))
 
+from common.config_manager import ConfigManager  # noqa: E402
 from reports import Reports  # noqa: E402
 from request_fields import RequestFields  # noqa: E402
 
 GOLDEN = os.path.join(os.path.dirname(__file__), "fixtures", "golden")
+MASTER = os.path.join(_ROOT, "files", "master.xlsx")
 TEST_FILES = os.path.join(os.path.dirname(__file__), "test_files")
 OUTPUT_DIR = os.path.join(_ROOT, "files", "outputs")
 FALLBACK_LETTERHEAD = ["מדינת ישראל", "האוצר - אגף התקציבים", "תקציב רגיל"]
@@ -86,6 +88,8 @@ def render(request: str) -> str:
         budget_history=budget_history,
         source_url=golden.get("source"),
         llm_usage=None,
+        request_id=request,
+        master_names=(ConfigManager.read_master_names(MASTER) if os.path.isfile(MASTER) else None),
     )
 
 

@@ -38,6 +38,11 @@ thead{display:table-header-group}
 tr{break-inside:avoid}
 th,td{border-bottom:1px solid var(--rule);padding:5px 8px;text-align:right;vertical-align:top}
 th{color:var(--muted);font-weight:400;font-size:11px;border-bottom:1px solid var(--rule-strong);white-space:nowrap}
+table.hist{font-size:10.5px;table-layout:auto}
+table.hist th{white-space:normal;line-height:1.25;vertical-align:bottom;max-width:9em}
+table.hist td{white-space:nowrap}
+.legend{font-size:11px;color:var(--muted);margin:2px 0 8px}
+.legend .sw{display:inline-block;width:10px;height:10px;background:var(--ok-bg);border:1px solid var(--ok);vertical-align:middle;margin-left:4px}
 td.n,th.n{text-align:left;direction:ltr;white-space:nowrap}
 tr.m td{background:var(--ok-bg)}
 td.code{white-space:nowrap}
@@ -54,6 +59,7 @@ td.code{white-space:nowrap}
 .foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:22px;padding-top:8px;border-top:1px solid var(--rule);font-size:11px;color:var(--faint)}
 .foot a{color:var(--accent)}
 .tbl{overflow-x:auto}
+@media print{ .tbl{overflow:visible} }
 </style>
 </head>
 <body>
@@ -101,7 +107,8 @@ td.code{white-space:nowrap}
 
 {% if intro or programs %}
 <h3>עיקרי הפנייה</h3>
-{% if intro %}<p>{{ intro | bold_numbers }}</p>{% endif %}
+{% for line in intro_lines %}<p>{{ line | bold_labels }}</p>
+{% endfor %}
 {% for p in programs %}
 <div class="prog{{ ' m' if p.in_master else '' }}">
   <div class="h"><span class="num">{{ p.code }}</span>: {{ p.heading | bold_numbers }}{% if p.in_master %}<span class="tag">במאסטר</span>{% endif %}</div>
@@ -122,7 +129,7 @@ td.code{white-space:nowrap}
 
 {% if table_rows %}
 <h3>טבלת השינויים</h3>
-<p class="note">שחזור טבלת המכתב. שורות של תוכניות מהמאסטר מסומנות בירוק.</p>
+{% if relevant %}<p class="legend"><span class="sw"></span> שורה ירוקה = תוכנית מהמאסטר</p>{% endif %}
 <div class="tbl"><table>
 <thead><tr><th>מספר פרט</th><th>שם הפרט</th><th></th>{% for m in metrics %}<th class="n">{{ m }}</th>{% endfor %}<th class="n">שינוי</th><th>master</th></tr></thead>
 <tbody>
@@ -135,7 +142,7 @@ td.code{white-space:nowrap}
 
 {% for h in history %}
 <h3>{{ h.title }}</h3>
-<div class="tbl"><table>
+<div class="tbl"><table class="hist">
 <thead><tr>{% for c in h.columns %}<th class="{{ 'n' if not loop.first else '' }}">{{ c }}</th>{% endfor %}</tr></thead>
 <tbody>
 {% for r in h.rows %}<tr class="{{ 'm' if r.in_master else '' }}">{% for v in r.cells %}<td class="{{ 'code num' if loop.first else 'n num' }}">{{ v }}</td>{% endfor %}</tr>

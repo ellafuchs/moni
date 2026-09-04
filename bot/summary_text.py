@@ -11,7 +11,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-_HEADING = re.compile(r"(?<![\d.,/-])(\d{6})\s*:(?!\d)")
+# Program headings come in three shapes: '231039: שם – סכום', '19-42-02 - מנהל התרבות',
+# and 'תוכנית 17-31-03: מטה אזרחי – 25,600 אלפי ש"ח'. All normalise to a 6-digit code.
+_HEADING = re.compile(
+    r"(?:תו?כנית\s+)?(?<![\d.,/])(?P<code>\d{6}|\d{2}-\d{2}-\d{2})(?!\d)\s*[:\-–]\s*(?=\S)")
 _DESC = re.compile(r"תיאור הת[ו]?כנית\s*:")
 _PURPOSE = re.compile(r"מטרת השינוי(?: התקציבי)?\s*:")
 _LABEL_AT_START = re.compile(r"^\s*(תיאור הת[ו]?כנית|מטרת השינוי(?: התקציבי)?)\s*:")
@@ -24,7 +27,10 @@ def structure_summary(text: str) -> str:
     whitespace normalisation. Known PDF split-word artifact 'השי נוי' is repaired.
     """
     text = re.sub(r"הש[יי] נוי", "השינוי", text or "")
+    # The staffing statement is shown as its own fact tile; keep it out of the narrative.
+    text = re.sub(r"\s*השפעה על כו?ח אדם\s*:\s*[^\n.]*\.?\s*$", "", text)
     text = _HEADING.sub(lambda m: "\n" + m.group(0), text)
+    text = re.sub(r"\n\s*\n", "\n", text)
     text = _DESC.sub(lambda m: "\n" + m.group(0), text)
     text = _PURPOSE.sub(lambda m: "\n" + m.group(0), text)
     lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.split("\n")]
@@ -50,7 +56,8 @@ def split_programs(text: str) -> tuple[str, list[Program]]:
     for line in lines:
         m = _HEADING.match(line)
         if m:
-            current = Program(code=m.group(1), heading=line[m.end():].strip(" .-–:"))
+            current = Program(code=m.group("code").replace("-", ""),
+                              heading=line[m.end():].strip(" .-–:"))
             programs.append(current)
             target = "other"
             continue
@@ -68,4 +75,5 @@ def split_programs(text: str) -> tuple[str, list[Program]]:
         else:
             joined = getattr(current, target)
             setattr(current, target, f"{joined} {line}".strip() if joined else line)
-    return " ".join(intro).strip(), programs
+    # No headings at all: keep the intro line by line so labels still start lines.
+    return ("\n".join(intro) if not programs else " ".join(intro)).strip(), programs
