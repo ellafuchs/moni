@@ -7,7 +7,7 @@
 :root{
   --paper:#F7F8FA; --card:#FFFFFF; --ink:#1B2430; --muted:#5B6470; --faint:#8C95A1; --rule:#D8DDE3; --rule-strong:#B9C1CB;
   --accent:#1F4E8C; --accent-soft:#E7EEF8;
-  --ok:#1E7F5C; --ok-bg:#E4F3EC; --warn:#8A5A0B; --warn-bg:#FBF0D9; --neu-bg:#EEF1F5;
+  --ok:#1B7A57; --ok-bg:#DDF2E6; --ok-row:#E8F6EE; --warn:#8A5A0B; --warn-bg:#FBEFD6; --neu-bg:#EEF1F5; --head-bg:#F1F4F8;
 }
 @page{ size:A4; margin:16mm 14mm; }
 html{direction:rtl}
@@ -16,7 +16,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:Arial,"Arial 
 @media print{ .page{max-width:none;padding:0;background:transparent} body{background:transparent} }
 h1,h3{margin:0;font-weight:700}
 h1{font-size:24px;line-height:1.25}
-h3{font-size:16px;margin:22px 0 8px;padding-bottom:4px;border-bottom:1px solid var(--rule);break-after:avoid}
+h3{font-size:16px;margin:22px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--accent-soft);color:var(--accent);break-after:avoid}
 .num{font-variant-numeric:tabular-nums}
 .title{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
 .stamp{font-size:11px;color:var(--faint)}
@@ -27,7 +27,8 @@ h3{font-size:16px;margin:22px 0 8px;padding-bottom:4px;border-bottom:1px solid v
 .meta .wide{grid-column:1 / -1}
 .meta .ltr{direction:ltr;unicode-bidi:isolate;display:inline-block;text-align:left}
 .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0 6px;break-inside:avoid}
-.fact{border-radius:6px;padding:10px 14px}
+.fact{border-radius:6px;padding:10px 14px;border-right:4px solid transparent}
+.fact.ok{border-right-color:var(--ok)} .fact.warn{border-right-color:var(--warn)} .fact.neu,.fact.no{border-right-color:var(--rule-strong)}
 .fact .k{font-size:11px;opacity:.85}
 .fact .v{font-size:20px;font-weight:700;margin:2px 0}
 .fact .why{font-size:11.5px;line-height:1.4}
@@ -39,17 +40,20 @@ table{border-collapse:collapse;width:100%;font-size:12px}
 thead{display:table-header-group}
 tr{break-inside:avoid}
 th,td{border-bottom:1px solid var(--rule);padding:5px 8px;text-align:right;vertical-align:top}
-th{color:var(--muted);font-weight:400;font-size:11px;border-bottom:1px solid var(--rule-strong);white-space:nowrap}
-table.hist{font-size:10.5px;table-layout:auto}
-table.hist th{white-space:normal;line-height:1.25;vertical-align:bottom;max-width:9em}
-table.hist td{white-space:nowrap}
+th{color:var(--muted);font-weight:400;font-size:11px;border-bottom:1px solid var(--rule-strong);white-space:nowrap;background:var(--head-bg)}
+/* The letter's appendix tables run LEFT to right (code column first on the left),
+   unlike the budget table; keep that orientation so the page reads like the letter. */
+table.hist{font-size:10.5px;table-layout:auto;direction:ltr}
+table.hist th{white-space:normal;line-height:1.25;vertical-align:bottom;max-width:9em;direction:rtl;text-align:center}
+table.hist td{white-space:nowrap;text-align:center}
 .legend{font-size:11px;color:var(--muted);margin:2px 0 8px}
 .legend .sw{display:inline-block;width:10px;height:10px;background:var(--ok-bg);border:1px solid var(--ok);vertical-align:middle;margin-left:4px}
 td.n,th.n{text-align:left;direction:ltr;white-space:nowrap}
-tr.m td{background:var(--ok-bg)}
+tr.m td{background:var(--ok-row)}
+tbody tr:not(.m):nth-child(even) td{background:#FAFBFC}
 td.code{white-space:nowrap}
-.prog{margin:10px 0 0;padding:9px 13px;border-right:3px solid var(--rule-strong);background:var(--paper);break-inside:avoid}
-.prog.m{border-right-color:var(--ok)}
+.prog{margin:10px 0 0;padding:9px 13px;border-right:3px solid var(--rule-strong);background:var(--paper);break-inside:avoid;border-radius:0 4px 4px 0}
+.prog.m{border-right-color:var(--ok);background:#F3FAF6}
 .prog .h{font-weight:700;font-size:14px;margin-bottom:3px}
 .prog p{margin:3px 0}
 .lbl{font-weight:700}
@@ -130,9 +134,20 @@ td.code{white-space:nowrap}
 </ol>
 {% endif %}
 
+{% if history and relevant %}<p class="legend"><span class="sw"></span> שורה ירוקה = תוכנית מהמאסטר</p>{% endif %}
+{% for h in history %}
+<h3>{{ h.title }}</h3>
+<div class="tbl"><table class="hist">
+<thead><tr>{% for c in h.columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+<tbody>
+{% for r in h.rows %}<tr class="{{ 'm' if r.in_master else '' }}">{% for v in r.cells %}<td class="num">{{ v }}</td>{% endfor %}</tr>
+{% endfor %}
+</tbody></table></div>
+{% endfor %}
+
 {% if table_rows %}
 <h3>טבלת השינויים</h3>
-{% if relevant %}<p class="legend"><span class="sw"></span> שורה ירוקה = תוכנית מהמאסטר</p>{% endif %}
+{% if relevant and not history %}<p class="legend"><span class="sw"></span> שורה ירוקה = תוכנית מהמאסטר</p>{% endif %}
 <div class="tbl"><table>
 <thead><tr><th>מספר פרט</th><th>שם הפרט</th><th></th>{% for m in metrics %}<th class="n">{{ m }}</th>{% endfor %}<th class="n">שינוי</th><th>master</th></tr></thead>
 <tbody>
@@ -143,18 +158,8 @@ td.code{white-space:nowrap}
 </tbody></table></div>
 {% endif %}
 
-{% for h in history %}
-<h3>{{ h.title }}</h3>
-<div class="tbl"><table class="hist">
-<thead><tr>{% for c in h.columns %}<th class="{{ 'n' if not loop.first else '' }}">{{ c }}</th>{% endfor %}</tr></thead>
-<tbody>
-{% for r in h.rows %}<tr class="{{ 'm' if r.in_master else '' }}">{% for v in r.cells %}<td class="{{ 'code num' if loop.first else 'n num' }}">{{ v }}</td>{% endfor %}</tr>
-{% endfor %}
-</tbody></table></div>
-{% endfor %}
-
 <div class="foot">
-  <div>{% if source_url %}המכתב המקורי: <a href="{{ source_url }}">{{ source_url }}</a>{% elif source_name %}המכתב המקורי: {{ source_name }}{% endif %}</div>
+  <div>{% if source_url %}המכתב המקורי: <a href="{{ source_url }}">{{ source_url }}</a>{% elif source_name %}המכתב המקורי: <span dir="ltr" style="unicode-bidi:isolate">{{ source_name }}</span>{% endif %}</div>
   {% if usage %}<div>הסיכום הופק אוטומטית בעזרת מודל השפה {{ usage.model }}. היקף העיבוד: <span class="num">{{ usage.tokens }}</span> טוקנים{% if usage.cost_ils is not none %}; עלות משוערת: ₪{{ usage.cost_ils }}{% if usage.cost_ils == "0.00" %} (מסלול חינמי){% endif %}{% endif %}.</div>{% endif %}
 </div>
 
