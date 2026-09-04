@@ -7,7 +7,7 @@
 :root{
   --paper:#F7F8FA; --card:#FFFFFF; --ink:#1B2430; --muted:#5B6470; --faint:#8C95A1; --rule:#D8DDE3; --rule-strong:#B9C1CB;
   --accent:#1F4E8C; --accent-soft:#E7EEF8;
-  --ok:#1B7A57; --ok-bg:#DDF2E6; --ok-row:#E8F6EE; --warn:#8A5A0B; --warn-bg:#FBEFD6; --neu-bg:#EEF1F5; --head-bg:#F1F4F8;
+  --ok:#1B7A57; --ok-bg:#D3EDDD; --ok-row:#D9F0E3; --warn:#8A5A0B; --warn-bg:#FBEFD6; --neu-bg:#EEF1F5; --head-bg:#F1F4F8;
 }
 @page{ size:A4; margin:16mm 14mm; }
 html{direction:rtl}
@@ -50,10 +50,11 @@ table.hist td{white-space:nowrap;text-align:center}
 .legend .sw{display:inline-block;width:10px;height:10px;background:var(--ok-bg);border:1px solid var(--ok);vertical-align:middle;margin-left:4px}
 td.n,th.n{text-align:left;direction:ltr;white-space:nowrap}
 tr.m td{background:var(--ok-row)}
+tr.m td:first-child{box-shadow:inset -4px 0 0 var(--ok)}
 tbody tr:not(.m):nth-child(even) td{background:#FAFBFC}
 td.code{white-space:nowrap}
 .prog{margin:10px 0 0;padding:9px 13px;border-right:3px solid var(--rule-strong);background:var(--paper);break-inside:avoid;border-radius:0 4px 4px 0}
-.prog.m{border-right-color:var(--ok);background:#F3FAF6}
+.prog.m{border-right-color:var(--ok);background:#E9F6EF}
 .prog .h{font-weight:700;font-size:14px;margin-bottom:3px}
 .prog p{margin:3px 0}
 .lbl{font-weight:700}
