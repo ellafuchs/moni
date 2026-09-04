@@ -69,6 +69,16 @@ def _extras(request: str) -> dict:
     return extras
 
 
+def _fields(golden) -> RequestFields:
+    """The fixture's fields; an empty program list is derived from the summary like the
+    pipeline derives it (older fixtures predate that extractor)."""
+    from agent import Agent
+    text = dict(golden["text"])
+    if not text.get("program_number"):
+        text["program_number"] = Agent._program_number(text.get("request_summary", ""))
+    return RequestFields(**text)
+
+
 def render(request: str) -> str:
     golden = json.load(open(os.path.join(GOLDEN, f"{request}.json"), encoding="utf-8"))
     extras = _extras(request)
@@ -81,7 +91,7 @@ def render(request: str) -> str:
         out,
         # write_summary looks up Hebrew field labels; golden["text"] has the English
         # attribute names, so rebuild the RequestFields (model_dump by_alias -> Hebrew).
-        fields=RequestFields(**golden["text"]),
+        fields=_fields(golden),
         table=pd.DataFrame(golden["table"]),
         letterhead=extras["letterhead"],
         name_column="name",

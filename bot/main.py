@@ -57,6 +57,18 @@ def render_summary(result, slug: str, output_dir: Path,
         shutil.copyfile(letter.doc.local_path(), output_dir / f"{slug}_original.pdf")
     except Exception:  # noqa: BLE001 - non-fatal, keep the run going
         logger.exception("%s: could not save original PDF", slug)
+    # What the extraction produced, as JSON next to the PDF: lets us re-render or compare
+    # the text without another model call.
+    try:
+        import json
+        (output_dir / f"{slug}_extraction.json").write_text(json.dumps({
+            "request_id": slug, "source": str(letter.source),
+            "fields": result.fields.model_dump(), "coalition_reason": result.coalition_reason,
+            "matched_codes": sorted(result.matched_codes), "relevant": result.relevant,
+            "llm_usage": result.llm_usage,
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:  # noqa: BLE001 - never fail the run over the side file
+        logger.exception("%s: could not write extraction json", slug)
     try:
         pdf_path = Reports().write_summary(
             output_dir / f"{slug}_summary.pdf",

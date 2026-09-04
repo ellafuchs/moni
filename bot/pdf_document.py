@@ -169,9 +169,38 @@ class PdfDocument:
                 fixed = "\n".join(self._fix_line(line) for line in raw.splitlines())
                 wants_tables = self._is_header_text(raw) or any(
                     marker in fixed for marker in self.TABLE_PAGE_MARKERS)
-                tables = (page.extract_tables(self.TABLE_SETTINGS) or []) if wants_tables else []
+                tables = self._page_tables(page) if wants_tables else []
                 parsed.append((raw, fixed, tables))
         return parsed
+
+    def _page_tables(self, page) -> list:
+        """All tables on a page; a table that lost outer columns is rebuilt on a grid.
+
+        In some letters the appendix's second history table is drawn with borders
+        pdfplumber does not pick up on its outer columns, so it comes back narrower than
+        the first table (7 columns instead of 9) and loses the program codes. The text is
+        on the page, only the detection is short — so such a table is re-extracted on an
+        explicit grid: the widest table's column edges + its own row edges.
+        """
+        found = page.find_tables(self.TABLE_SETTINGS)
+        if not found:
+            return []
+        width = lambda t: len(t.rows[0].cells) if t.rows else 0  # noqa: E731
+        widest = max(found, key=width)
+        xs = sorted({round(x, 1) for row in widest.rows for c in row.cells if c for x in (c[0], c[2])})
+        tables = []
+        for t in found:
+            if t is not widest and 0 < width(t) < width(widest):
+                ys = sorted({round(y, 1) for row in t.rows for c in row.cells if c for y in (c[1], c[3])})
+                rebuilt = page.extract_table({
+                    "vertical_strategy": "explicit", "explicit_vertical_lines": xs,
+                    "horizontal_strategy": "explicit", "explicit_horizontal_lines": ys,
+                })
+                if rebuilt and len(rebuilt[0]) == width(widest):
+                    tables.append(rebuilt)
+                    continue
+            tables.append(t.extract())
+        return tables
 
     # ---- text ----
 

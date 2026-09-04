@@ -172,3 +172,38 @@ def test_staffing_sentence_dropped_from_narrative_and_header_space():
     intro, programs = split_programs("19-42-02 - מנהל התרבות תיאור התוכנית: א. מטרת השינוי: ב. השפעה על כוח אדם: אין .")
     assert programs[0].purpose == "ב." and "השפעה" not in programs[0].purpose
     assert clean_header("מאושר 2025 בניכוי עודפים שעברו ב- 2025") == "מאושר 2025 בניכוי עודפים שעברו ב-2025"
+
+
+def test_join_two_split_letters_in_a_row():
+    from reports import join_split_letters
+    assert join_split_letters("המוצע בפנייה ז ו") == "המוצע בפנייה זו"
+    assert join_split_letters("הוצאה מותנית בהכנס ה") == "הוצאה מותנית בהכנסה"
+
+
+def test_history_code_column_is_not_number_formatted_and_source_link_only_for_urls():
+    sample = _sample()
+    ctx = Reports().build_context(**sample)
+    assert ctx["history"][0]["rows"][0]["cells"][0] == "231039"
+    assert ctx["source_url"] == "https://example.org/21658.pdf"
+    sample["source_url"] = "/tmp/letters/21658_original.pdf"
+    ctx = Reports().build_context(**sample)
+    assert ctx["source_url"] == "" and ctx["source_name"] == "21658_original.pdf"
+
+
+def test_structure_summary_drops_table_rows_and_sign_off_and_repairs_labels():
+    text = ("תוכנית 17-31-03: מטה אזרחי – 25,600 אלפי ש\"ח תיאור התוכני ת: תכנית זו. מטרת השינוי: תוספת.\n"
+            "173102 0 72,882 70,582\n173103 25,600 75,190 55,350\nבכבוד רב,\nהעתק:\nהחשב הכללי")
+    intro, programs = split_programs(text)
+    assert len(programs) == 1
+    assert programs[0].description == "תכנית זו." and programs[0].purpose == "תוספת."
+    assert not programs[0].other
+
+
+def test_split_letter_before_hyphen():
+    from summary_text import join_split_letters
+    assert join_split_letters("מט ה- מפקדת תיאום") == "מטה- מפקדת תיאום"
+
+
+def test_prefix_letter_before_number_is_not_joined():
+    from summary_text import join_split_letters
+    assert join_split_letters("שעברו ב-2025 ו-2857") == "שעברו ב-2025 ו-2857"

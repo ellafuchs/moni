@@ -21,9 +21,11 @@ h3{font-size:16px;margin:22px 0 8px;padding-bottom:4px;border-bottom:1px solid v
 .title{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
 .stamp{font-size:11px;color:var(--faint)}
 .sub{color:var(--muted);font-size:12px;margin-top:2px}
-.meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 32px;padding:12px 0;margin:12px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
-.meta b{font-weight:400;color:var(--muted);margin-left:6px}
-.meta .ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px 32px;padding:12px 0;margin:12px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.meta .k{display:block;font-size:11px;color:var(--muted)}
+.meta .v{font-size:13.5px}
+.meta .wide{grid-column:1 / -1}
+.meta .ltr{direction:ltr;unicode-bidi:isolate;display:inline-block;text-align:left}
 .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0 6px;break-inside:avoid}
 .fact{border-radius:6px;padding:10px 14px}
 .fact .k{font-size:11px;opacity:.85}
@@ -56,7 +58,8 @@ td.code{white-space:nowrap}
 .links li{margin:2px 0}
 .links a{color:var(--accent)}
 .note{color:var(--muted);font-size:11.5px;margin:2px 0 8px}
-.foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:22px;padding-top:8px;border-top:1px solid var(--rule);font-size:11px;color:var(--faint)}
+.foot{display:grid;gap:4px;margin-top:22px;padding-top:8px;border-top:1px solid var(--rule);font-size:11px;color:var(--faint)}
+.foot a{word-break:break-all}
 .foot a{color:var(--accent)}
 .tbl{overflow-x:auto}
 @media print{ .tbl{overflow:visible} }
@@ -72,10 +75,10 @@ td.code{white-space:nowrap}
 {% if letterhead_line %}<div class="sub">{{ letterhead_line }}</div>{% endif %}
 
 <div class="meta">
-  {% if date %}<div><b>תאריך הבקשה</b> <span class="num">{{ date }}</span></div>{% endif %}
-  {% if committee %}<div><b>מספר פנייה לוועדה</b> <span class="num">{{ committee }}</span></div>{% endif %}
-  {% if request_numbers %}<div><b>מס' בקשה</b> <span class="num ltr">{{ request_numbers }}</span></div>{% endif %}
-  {% if program_codes %}<div><b>מס' תוכנית</b> <span class="num ltr">{{ program_codes | join(', ') }}</span></div>{% endif %}
+  {% if date %}<div><span class="k">תאריך הבקשה</span><span class="v num">{{ date }}</span></div>{% endif %}
+  {% if committee %}<div><span class="k">מספר פנייה לוועדה</span><span class="v num">{{ committee }}</span></div>{% endif %}
+  {% if request_numbers %}<div class="wide"><span class="k">מס' בקשה</span><span class="v num ltr">{{ request_numbers }}</span></div>{% endif %}
+  {% if program_codes %}<div class="wide"><span class="k">מס' תוכנית</span><span class="v num ltr">{{ program_codes | join(', ') }}</span></div>{% endif %}
 </div>
 
 <div class="facts">
@@ -151,8 +154,8 @@ td.code{white-space:nowrap}
 {% endfor %}
 
 <div class="foot">
-  <span>{% if source_url %}מקור: <a href="{{ source_url }}">המכתב המקורי{% if request_id %} {{ request_id }}{% endif %}</a>{% endif %}</span>
-  <span>{% if usage %}מודל: {{ usage.model }} · <span class="num">{{ usage.tokens }}</span> טוקנים{% if usage.cost_ils is not none %} · עלות ≈ ₪{{ usage.cost_ils }}{% endif %}{% endif %}</span>
+  <div>{% if source_url %}המכתב המקורי: <a href="{{ source_url }}">{{ source_url }}</a>{% elif source_name %}המכתב המקורי: {{ source_name }}{% endif %}</div>
+  {% if usage %}<div>הסיכום הופק אוטומטית בעזרת מודל השפה {{ usage.model }}. היקף העיבוד: <span class="num">{{ usage.tokens }}</span> טוקנים{% if usage.cost_ils is not none %}; עלות משוערת: ₪{{ usage.cost_ils }}{% if usage.cost_ils == "0.00" %} (מסלול חינמי){% endif %}{% endif %}.</div>{% endif %}
 </div>
 
 </div>
