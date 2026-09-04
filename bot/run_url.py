@@ -26,6 +26,7 @@ def run(source: str):
     config = ConfigManager(CONFIG_PATH)
     config.load_master(MASTER_PATH)
     master_programs = config.get_ids()
+    master_names = ConfigManager.read_master_names(MASTER_PATH)
     extractor = agent.Agent(
         master_programs,
         api_key=config.get_api_key(),
@@ -38,7 +39,7 @@ def run(source: str):
     relevant_programs = {
         code: master_programs.get(code, "") for code in sorted(result.matched_codes)
     }
-    rendered = render_summary(result, _slug(source), OUTPUT_DIR, relevant_programs)
+    rendered = render_summary(result, _slug(source), OUTPUT_DIR, relevant_programs, master_names)
     return rendered, result
 
 

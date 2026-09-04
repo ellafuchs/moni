@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from budget_letter import BudgetLetter
 from request_fields import RequestFields
+from summary_text import structure_summary
 
 # Load OPENAI_API_KEY from .env even when imported standalone.
 load_dotenv()
@@ -51,8 +52,13 @@ PRICING_USD_PER_1M = {
 
 
 class _Analysis(BaseModel):
-    """The one LLM call's output: the coalition judgment + the narrative-end boundary
-    (so the summary can be sliced verbatim from the text — no reflow)."""
+    """The one LLM call's output: the coalition judgment (+ its reason) and the request
+    text copied verbatim."""
+    coalition_reason: str = Field(
+        default="",
+        description="One short Hebrew sentence quoting the letter's basis for the "
+                    "coalition_funds answer (e.g. which program allocates coalition money, "
+                    "or that the letter states it includes none). Empty if nothing relevant.")
     coalition_funds: str = Field(
         description="'כן' if the letter actually USES/allocates coalition funds, or asks "
                     "the committee to keep monitoring them going forward; else 'לא'. "
@@ -76,6 +82,7 @@ class Extraction:
     relevant: bool             # a summary is produced iff this is True
     letter: BudgetLetter       # kept for rendering (letterhead, history, original PDF)
     llm_usage: dict | None = None   # token counts + cost of the one coalition call
+    coalition_reason: str = ""      # the model's one-sentence basis for coalition_funds
 
 
 class Agent:
@@ -87,8 +94,11 @@ class Agent:
         "או מבקשת מהוועדה להמשיך ולעקוב אחריהם; אחרת 'לא'. רק אזכור של קואליציה, או "
         "'אינה כוללת כספים קואליציוניים', הם 'לא'. המשפט הכללי 'האם יש התייחסות לכספים "
         "קואליציונים' לבדו אינו מספיק.\n"
-        "2) request_summary: החזר את הנרטיב של הפנייה כטקסט עברי רציף ונקי — פסקת הפתיחה, "
-        "ולכל תכנית את שורת 'NNNNNN: <שם> – <סכום>', 'תיאור התוכנית' ו'מטרת השינוי'. "
+        "   coalition_reason: משפט קצר אחד שמצטט את הבסיס לתשובה (למשל איזו תכנית מקצה "
+        "תקציב קואליציוני, או שהפנייה מצהירה שאינה כוללת כספים קואליציוניים).\n"
+        "2) request_summary: החזר את הנרטיב של הפנייה כטקסט עברי נקי — פסקת הפתיחה, "
+        "ולכל תכנית, בשורה חדשה, את שורת 'NNNNNN: <שם> – <סכום>', ואחריה בשורות נפרדות "
+        "'תיאור התוכנית' ו'מטרת השינוי'. "
         "העתק את הניסוח בנאמנות; אל תמציא, אל תקצר ואל תנסח מחדש. אל תכלול טבלאות ורשימות "
         "מספרים (למשל טבלת סיכום קואליציונית המסתיימת ב'סה\"כ'), את מקטע הקישורים ואת החתימה."
     )
@@ -120,8 +130,9 @@ class Agent:
         text = letter.doc.text
 
         region = self._narrative_region(text)
-        # The ONE LLM call: coalition judgment + the full request text (not a summary).
-        coalition, summary, usage = self._analyze(region)
+        # The ONE LLM call: coalition judgment (+ reason) + the full request text.
+        coalition, reason, summary, usage = self._analyze(region)
+        summary = structure_summary(summary)
         fields = RequestFields(
             date=self._date(text),
             request_number=self._request_number(text),
@@ -133,7 +144,7 @@ class Agent:
         )
 
         table, matched = self._table(letter)
-        return Extraction(fields, table, matched, bool(matched), letter, usage)
+        return Extraction(fields, table, matched, bool(matched), letter, usage, reason)
 
     # --------------------------------------------------- deterministic tools
     @staticmethod
@@ -224,13 +235,13 @@ class Agent:
     def _analyze(self, region: str):
         """The ONE LLM call over the narrative region — NO fallback.
 
-        Returns (coalition 'כן'/'לא', narrative_end phrase, usage dict). An empty region
-        (no narrative) is ('לא', '', None) with no call. Otherwise the model returns the
+        Returns (coalition 'כן'/'לא', reason, request text, usage dict). An empty region
+        (no narrative) is ('לא', '', '', None) with no call. Otherwise the model returns the
         coalition judgment and where the narrative ends; if the model is unavailable the
         error surfaces — it is not masked by a deterministic answer.
         """
         if not region:
-            return "לא", "", None
+            return "לא", "", "", None
 
         from langchain.chat_models import init_chat_model
 
@@ -244,7 +255,8 @@ class Agent:
         result = llm.invoke([("system", self._ANALYSIS_SYSTEM), ("user", region)])
         parsed = result["parsed"]
         coalition = "כן" if "כן" in (parsed.coalition_funds or "").strip() else "לא"
-        return coalition, (parsed.request_summary or "").strip(), self._usage(result.get("raw"))
+        return (coalition, (parsed.coalition_reason or "").strip(),
+                (parsed.request_summary or "").strip(), self._usage(result.get("raw")))
 
     def _usage(self, raw) -> dict:
         """Token counts + a rough USD cost estimate from the raw AIMessage."""

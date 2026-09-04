@@ -82,10 +82,11 @@ def build_message(
     msg["To"] = ", ".join(recipients)
     msg.set_content(content)
     for attachment in attachments:
+        is_html = attachment.name.lower().endswith((".html", ".htm"))
         msg.add_attachment(
             attachment.data,
-            maintype="application",
-            subtype="pdf",
+            maintype="text" if is_html else "application",
+            subtype="html" if is_html else "pdf",
             filename=attachment.name,
         )
     return {"raw": base64.urlsafe_b64encode(msg.as_bytes()).decode("ascii")}
