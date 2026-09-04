@@ -125,3 +125,50 @@ def test_split_final_letters_are_rejoined():
     assert join_split_letters("היסטוריה תקציבית של הפנייה - הוצאה נט ו") == "היסטוריה תקציבית של הפנייה - הוצאה נטו"
     assert join_split_letters("קוד תוכני ת") == "קוד תוכנית"
     assert join_split_letters("מקורי 2026") == "מקורי 2026"
+
+
+def test_hyphenated_program_headings_are_split():
+    text = ('הפניה נועדה לתקצוב סך של 103,500 אלפי ש"ח. עיקרי הפנייה בחלוקה לתוכניות מובאים להלן: '
+            '19-42-02 - מנהל התרבו ת תיאור התוכנית: תכנית זו משמשת. מטרת השינוי: תקצוב 63 מיליוני ש"ח. '
+            '19-43-03 - מינהל הספורט תיאור התכנית: ספורט. מטרת השינוי התקציבי: תקצוב 40,500 אלפי ש"ח. '
+            'תוכנית 17-31-03: מטה אזרחי – 25,600 אלפי ש"ח בהוצאה מותנית בהכנסה תיאור התוכנית: מטה.')
+    intro, programs = split_programs(text)
+    assert [p.code for p in programs] == ["194202", "194303", "173103"]
+    assert programs[0].heading.startswith("מנהל התרבו")
+    assert programs[1].purpose.startswith("תקצוב 40,500")
+    assert programs[2].heading.startswith("מטה אזרחי")
+
+
+def test_no_headings_keeps_lines():
+    intro, programs = split_programs("שורה ראשונה\nתיאור התוכנית: משהו\nמטרת השינוי: אחר")
+    assert programs == [] and intro.count("\n") == 2
+
+
+def test_join_split_letters_keeps_conjunction_between_numbers():
+    from reports import join_split_letters
+    assert join_split_letters('סך של 500 אלפי ש" ח') == 'סך של 500 אלפי ש"ח'
+    assert join_split_letters("מנהל התרבו ת") == "מנהל התרבות"
+    assert join_split_letters("מספר 2856 ו 2857") == "מספר 2856 ו 2857"
+
+
+def test_history_cells_and_headers():
+    from reports import format_history_cell, clean_header
+    assert format_history_cell("12,900-") == "−12,900"
+    assert format_history_cell("-115,990") == "−115,990"
+    assert format_history_cell("1,703,020") == "1,703,020"
+    assert format_history_cell("0") == "0" and format_history_cell("") == ""
+    assert clean_header("מאושר 2025 בניכוי עודפים שעברו ב2025-") == "מאושר 2025 בניכוי עודפים שעברו ב-2025"
+
+
+def test_master_table_uses_longest_name():
+    sample = _sample()
+    sample["master_names"] = {"231039": "שירותים קהילתיים -"}   # truncated in the workbook
+    ctx = Reports().build_context(**sample)
+    assert ctx["master_rows"][0]["name"] == "שירותים קהילתיים - שירותים אישיים וחברתיים"
+
+
+def test_staffing_sentence_dropped_from_narrative_and_header_space():
+    from reports import clean_header
+    intro, programs = split_programs("19-42-02 - מנהל התרבות תיאור התוכנית: א. מטרת השינוי: ב. השפעה על כוח אדם: אין .")
+    assert programs[0].purpose == "ב." and "השפעה" not in programs[0].purpose
+    assert clean_header("מאושר 2025 בניכוי עודפים שעברו ב- 2025") == "מאושר 2025 בניכוי עודפים שעברו ב-2025"
