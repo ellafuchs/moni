@@ -172,8 +172,11 @@ class Agent:
     @staticmethod
     def _program_number(scope: str) -> str:
         """Program codes named as 'NNNNNN:' in the given text, in order, de-duplicated."""
-        codes = re.findall(r"תו?כנית\s*:?\s*(\d{5,6})", scope)
-        codes += re.findall(r"(?m)^\s*(\d{5,6})\s*:", scope)
+        # 'NNNNNN:' headings anywhere in the text (the model may return the narrative as
+        # one paragraph, so line starts cannot be relied on); a code is 5-6 digits that
+        # is not part of a longer number, a date or a hyphenated request number.
+        codes = re.findall(r"תו?כנית\s*:?\s*(\d{5,6})(?!\d)", scope)
+        codes += re.findall(r"(?<![\d.,/-])(\d{5,6})\s*:(?!\d)", scope)
         return ", ".join(dict.fromkeys(codes))
 
     @staticmethod
