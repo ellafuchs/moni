@@ -49,7 +49,8 @@ FALLBACK_URL = (
 
 
 def render_summary(result, slug: str, output_dir: Path,
-                   relevant_programs: dict | None = None) -> tuple[str, str] | None:
+                   relevant_programs: dict | None = None,
+                   master_names: dict | None = None) -> tuple[str, str] | None:
     """Copy the original PDF and render the summary PDF for one extracted letter."""
     letter = result.letter
     try:
@@ -67,6 +68,9 @@ def render_summary(result, slug: str, output_dir: Path,
             source_url=letter.source,
             llm_usage=result.llm_usage,
             relevant_programs=relevant_programs,
+            request_id=slug,
+            coalition_reason=result.coalition_reason,
+            master_names=master_names,
         )
     except Exception:  # noqa: BLE001 - log and skip, keep the run going
         logger.exception("%s: summary PDF failed", slug)
@@ -75,8 +79,14 @@ def render_summary(result, slug: str, output_dir: Path,
     return (pdf_path, f"{slug}_summary")
 
 
-EMAIL_SUBJECT = "סיכום מכתבי העברה תקציבית"
-EMAIL_BODY = "מצורפים סיכומי מכתבי ההעברה התקציבית הרלוונטיים לתוכניות הקרן."
+EMAIL_SUBJECT = "סיכום פנייה תקציבית"
+EMAIL_BODY = ("מצורף סיכום אוטומטי של פנייה תקציבית הרלוונטית לתוכניות הקרן, "
+              "כ-PDF וכדף HTML (בו הקישורים לחיצים).")
+
+
+def email_subject(path_names) -> str:
+    ids = [name.removesuffix("_summary") for _, name in path_names]
+    return f"{EMAIL_SUBJECT} {', '.join(ids)}" if ids else EMAIL_SUBJECT
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -108,7 +118,10 @@ def email_reports(sender: str | None, recipients: list[str], path_names) -> bool
     for path, name in path_names:
         with open(path, "rb") as f:
             attachments.append(Attachment(f.read(), f"{name}.pdf"))
-    send_email(sender, recipients, EMAIL_SUBJECT, EMAIL_BODY, attachments)
+        html = Path(path).with_suffix(".html")
+        if html.is_file():  # the same page as HTML — clickable links, easy to forward
+            attachments.append(Attachment(html.read_bytes(), f"{name}.html"))
+    send_email(sender, recipients, email_subject(path_names), EMAIL_BODY, attachments)
     logger.info("emailed %d PDF(s) to %s", len(attachments), ", ".join(recipients))
     return True
 
@@ -119,6 +132,7 @@ def main(argv=None) -> None:
     # Sync config's `programs` list from the master file, then use that dict.
     config.load_master(MASTER_PATH)
     master_programs = config.get_ids()  # {code: name}, now sourced from the master
+    master_names = ConfigManager.read_master_names(MASTER_PATH)  # full names for the page
     extractor = agent.Agent(
         master_programs,
         api_key=config.get_api_key(),
@@ -153,7 +167,7 @@ def main(argv=None) -> None:
         }
 
         # 3. render — one summary PDF per relevant letter.
-        rendered = render_summary(result, slug, OUTPUT_DIR, relevant_programs)
+        rendered = render_summary(result, slug, OUTPUT_DIR, relevant_programs, master_names)
         if rendered:
             path_names.append(rendered)
 

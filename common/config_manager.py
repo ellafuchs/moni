@@ -189,6 +189,37 @@ class ConfigManager:
         codes = df[ConfigManager.KEY].astype("Int64").astype(str).str.zfill(6)
         return dict(zip(codes, df[ConfigManager.PROGRAM_NAME]))
 
+    @staticmethod
+    def read_master_names(path: str) -> dict[str, str]:
+        """{6-digit code: full program name} from the master workbook.
+
+        The תוכניות sheet holds shortened names; the yearly fiscal sheet (its name starts
+        with the year, e.g. '2026פיסקלי דיגיטלי ') has the full ones under 'קוד תכנית' /
+        'שם תכנית'. Full names win, תוכניות names fill the gaps. Read-only; never raises
+        for a missing sheet — returns what it could find.
+        """
+        names: dict[str, str] = {}
+        try:
+            xls = pd.ExcelFile(path)
+        except Exception:  # noqa: BLE001 - no master, no names
+            return names
+        try:
+            names.update(ConfigManager.read_master_programs(path))
+        except Exception:  # noqa: BLE001
+            pass
+        fiscal = next((n for n in xls.sheet_names if str(n).strip().startswith("20")), None)
+        if fiscal:
+            try:
+                df = pd.read_excel(path, sheet_name=fiscal, usecols=["קוד תכנית", "שם תכנית"])
+                for code, name in zip(df["קוד תכנית"], df["שם תכנית"]):
+                    code = str(code).strip()
+                    if code.isdigit() and isinstance(name, str) and name.strip():
+                        names.setdefault(code.zfill(6), name.strip())
+                        names[code.zfill(6)] = name.strip()
+            except Exception:  # noqa: BLE001 - keep the short names
+                pass
+        return names
+
     def load_master(self, path: str) -> None:
         """Load program ids from the master file into config and save.
 
