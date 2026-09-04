@@ -245,6 +245,7 @@ class Reports:
                      "cost_ils": f"{cost * self.USD_TO_ILS:.2f}" if cost is not None else None}
 
         return {
+            "fonts_dir": (TEMPLATES / "fonts").as_uri(),
             "request_id": request_id or "",
             "generated": date.today().strftime("%d/%m/%Y"),
             "letterhead_line": " · ".join(join_split_letters(h) for h in (letterhead or [])),
