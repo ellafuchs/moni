@@ -48,3 +48,19 @@ def test_pdf_is_opened_once_for_all_accesses(counted_open):
 def test_pages_text_matches_text():
     doc = PdfDocument(SMALL_PDF)
     assert "\n".join(p.text for p in doc.pages) == doc.text
+
+
+PDF_21709 = os.path.join(_ROOT, "bot", "tests", "test_files", "21709_original.pdf")
+
+
+@pytest.mark.skipif(not os.path.isfile(PDF_21709), reason="21709 PDF not present")
+def test_narrow_history_table_is_rebuilt_with_all_columns():
+    """21709's second history table is detected without its outer columns; the reader
+    rebuilds it on the first table's grid so program codes are not lost."""
+    doc = PdfDocument(PDF_21709)
+    history_pages = [p for p in doc.pages if "היסטוריה תקציבית" in p.text]
+    assert history_pages
+    tables = [t for p in history_pages for t in p.tables]
+    assert len(tables) >= 2
+    assert {len(t[0]) for t in tables} == {9}
+    assert tables[1][1][0].strip() == "173102"

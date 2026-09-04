@@ -19,7 +19,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from markupsafe import Markup, escape
 
-from summary_text import split_programs
+from summary_text import join_split_letters, split_programs
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
 
@@ -61,22 +61,6 @@ def html_to_pdf(html_path, pdf_path, *, chrome: str | None = None, timeout: int 
     return str(pdf_path)
 
 
-_SPLIT_LETTER = re.compile(r"(\S) ([\u0590-\u05ea])(?=\s|$)")
-
-
-def join_split_letters(text: str) -> str:
-    """Re-join a final Hebrew letter the PDF reader split off: 'נט ו' -> 'נטו'.
-
-    A lone 'ו' after a number ('2856 ו 2857') is the conjunction, not a split letter,
-    and is left alone; 'ש" ח' -> 'ש"ח' and 'התרבו ת' -> 'התרבות' are joined."""
-    def fix(m):
-        prev, letter = m.group(1), m.group(2)
-        if letter == "ו" and prev.isdigit():
-            return m.group(0)
-        return prev + letter
-    return _SPLIT_LETTER.sub(fix, str(text or ""))
-
-
 _HISTORY_NUMBER = re.compile(r"^\s*(-?)([\d,]+)(-?)\s*$")
 
 
@@ -96,9 +80,9 @@ def format_history_cell(value) -> str:
 
 def clean_header(text) -> str:
     """History headers copied from the letter: rejoin split letters, fix 'ב2025-' -> 'ב-2025'."""
-    text = join_split_letters(text)
-    text = re.sub(r"ב(\d{4})-", r"ב-\1", text)
-    return re.sub(r"ב-\s+(\d{4})", r"ב-\1", text)
+    text = re.sub(r"ב(\d{4})-", r"ב-\1", str(text or ""))
+    text = re.sub(r"ב-\s+(\d{4})", r"ב-\1", text)
+    return join_split_letters(text)
 
 
 def _as_field_dict(fields) -> dict:
@@ -194,8 +178,8 @@ class Reports:
         numbers, committee = value, ""
         if "|" in value:
             numbers, committee = (part.strip() for part in value.split("|", 1))
-        committee = re.sub(r"^מספר פני\S* לועדה\s*:?\s*", "", committee).strip()
-        m = re.match(r"^מספר פני\S* לועדה\s*:?\s*(.*)$", numbers)
+        committee = re.sub(r"^מספר פני\S* לו?ועדה\s*:?\s*", "", committee).strip()
+        m = re.match(r"^מספר פני\S* לו?ועדה\s*:?\s*(.*)$", numbers)
         if m:  # only the committee part was present
             numbers, committee = "", m.group(1).strip()
         return numbers.strip(), committee
@@ -240,7 +224,7 @@ class Reports:
             columns = [clean_header(c) for c in df.columns]
             rows = []
             for _, rec in df.iterrows():
-                cells = [format_history_cell(rec[c]) for c in df.columns]
+                cells = [str(rec[df.columns[0]]).strip()] + [format_history_cell(rec[c]) for c in df.columns[1:]]
                 rows.append({"cells": cells, "in_master": cells[0].strip() in matched})
             history.append({"title": clean_header(title), "columns": columns, "rows": rows})
 
@@ -266,7 +250,9 @@ class Reports:
             "links": links,
             "metrics": metrics, "table_rows": table_rows,
             "history": history,
-            "source_url": source_url or "", "usage": usage,
+            "source_url": source_url if str(source_url or "").startswith(("http://", "https://")) else "",
+            "source_name": Path(str(source_url)).name if source_url else "",
+            "usage": usage,
         }
 
     # ---- rendering --------------------------------------------------------

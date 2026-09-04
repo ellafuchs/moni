@@ -17,7 +17,8 @@ ONE_LINE = ("הפנייה נועדה לתקצוב סך של 190,709 אלפי ש\
 
 
 def test_codes_found_mid_line_in_order_without_duplicates():
-    assert Agent._program_number(ONE_LINE) == "231039, 230120"
+    # the trailing 'תוכנית 17-31-03' is a hyphenated code and is listed normalised
+    assert Agent._program_number(ONE_LINE) == "231039, 230120, 173103"
 
 
 def test_codes_at_line_start_still_work():
@@ -26,3 +27,32 @@ def test_codes_at_line_start_still_work():
 
 def test_dates_and_years_are_not_codes():
     assert Agent._program_number("מיום 24.10.2021 עד 2026: תוכנית לשנים 2025-2029") == ""
+
+
+def test_narrative_region_accepts_double_yod_heading():
+    text = "בלה\nעיקריי הפנייה :\nהפנייה התקציבית נועדה לתקצוב.\nתאריך הבקשה: 26/07/2026\n"
+    assert Agent._narrative_region(text).startswith("הפנייה התקציבית")
+    assert Agent._narrative_region("עיקרי הפנייה: טקסט\nתאריך הבקשה: 1/1/2026").startswith("טקסט")
+
+
+def test_hyphenated_codes_are_listed_normalised():
+    assert Agent._program_number("תוכנית 17-31-03: מטה אזרחי – 25,600 אלפי ש\"ח. 17-31-08 – יחידת הפיקוח") == "173103, 173108"
+
+
+def test_committee_number_double_vav():
+    a = Agent(set())
+    assert "מספר פנייה לועדה: 123" in a._request_number("בקשה מספר 17-207\nמספר פניה לוועדה: 123\n")
+
+
+def test_narrative_region_stops_before_staffing_line_and_appendix():
+    text = ("עיקרי הפנייה:\nהפנייה נועדה.\n231039: שירותים – 1 אלפי ש\"ח\nתיאור התוכנית: א.\n"
+            "השפעה על כוח אדם: אין.\nבכבוד רב,\nהיסטוריה תקציבית של הפנייה\n231039 1 2 3\nתאריך הבקשה: 1/1/2026")
+    region = Agent._narrative_region(text)
+    assert region.endswith("תיאור התוכנית: א.")
+    assert "היסטוריה" not in region and "בכבוד רב" not in region
+
+
+def test_committee_list_order_is_restored():
+    a = Agent(set())
+    assert a._request_number("בקשה מספר 19-206\nמספר פניה לוועדה: 72 ,47\n").endswith("מספר פנייה לועדה: 47, 72")
+    assert a._request_number("בקשה מספר 30-205\nמספר פניה לועדה: 41 עד 43\n").endswith("מספר פנייה לועדה: 41 עד 43")

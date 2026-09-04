@@ -159,12 +159,17 @@ class Agent:
             m.replace(" ", "")
             for m in re.findall(r"בקשה מספר\s*(\d{2,3}\s*-\s*\d{2,3})", text)
         ))
-        committee = re.search(r"מספר פני\S* לועדה\s*:?\s*([^\n]+)", text)
+        committee = re.search(r"מספר פני\S* לו?ועדה\s*:?\s*([^\n]+)", text)
         parts = []
         if numbers:
             parts.append(", ".join(numbers))
         if committee:
-            parts.append(f"מספר פנייה לועדה: {committee.group(1).strip()}")
+            value = committee.group(1).strip()
+            # The line reversal that fixes Hebrew also reverses a number list:
+            # '47, 72' reads back as '72 ,47'. Put such lists back in order.
+            if re.fullmatch(r"\d+(?: ,\d+)+", value):
+                value = ", ".join(reversed(value.split(" ,")))
+            parts.append(f"מספר פנייה לועדה: {value}")
         return self._canonical_request_numbers(" | ".join(parts))
 
     @staticmethod
@@ -172,12 +177,18 @@ class Agent:
         """The narrative text (verbatim), from AFTER 'עיקרי הפנייה:' up to the budget-table
         pages — a bounded window the LLM inspects for the exact end boundary. The heading
         itself is excluded (the report's field label supplies it), so it isn't doubled."""
-        m = re.search(r"עיקרי הפנייה\s*:", text)
+        m = re.search(r"עיקרי+ הפנייה\s*:", text)
         if not m:
             return ""
-        # The table pages begin at 'תאריך הבקשה'; the narrative ends before them.
-        table_start = text.find("תאריך הבקשה", m.end())
-        end = table_start if table_start != -1 else min(len(text), m.start() + 16000)
+        # The narrative ends at the staffing line / sign-off / appendix, whichever comes
+        # first; the budget-table pages ('תאריך הבקשה') are a last resort. Keeping the
+        # appendix tables out of the window matters: a model asked to "copy verbatim"
+        # will otherwise copy them too.
+        end = min(len(text), m.start() + 16000)
+        for marker in (r"השפעה על כו?ח אדם", r"בכבוד רב", r"היסטוריה תקציבית", r"תאריך הבקשה"):
+            hit = re.search(marker, text[m.end():])
+            if hit:
+                end = min(end, m.end() + hit.start())
         return text[m.end():end].strip()
 
     @staticmethod
@@ -186,8 +197,12 @@ class Agent:
         # 'NNNNNN:' headings anywhere in the text (the model may return the narrative as
         # one paragraph, so line starts cannot be relied on); a code is 5-6 digits that
         # is not part of a longer number, a date or a hyphenated request number.
-        codes = re.findall(r"תו?כנית\s*:?\s*(\d{5,6})(?!\d)", scope)
-        codes += re.findall(r"(?<![\d.,/-])(\d{5,6})\s*:(?!\d)", scope)
+        code = r"(\d{5,6}|\d{2}-\d{2}-\d{2})"
+        pattern = re.compile(
+            rf"תו?כנית\s*:?\s*{code}(?![\d-])"            # 'תוכנית 231039' / 'תוכנית 17-31-03:'
+            rf"|(?<![\d.,/-]){code}\s*[:\-–](?!\d)")     # '231039:' / '19-42-02 -' as a heading
+        # One pass, in document order; '17-31-03' is the same code as '173103'.
+        codes = [(m.group(1) or m.group(2)).replace("-", "") for m in pattern.finditer(scope)]
         return ", ".join(dict.fromkeys(codes))
 
     @staticmethod
