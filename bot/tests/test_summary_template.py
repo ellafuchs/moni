@@ -207,3 +207,11 @@ def test_split_letter_before_hyphen():
 def test_prefix_letter_before_number_is_not_joined():
     from summary_text import join_split_letters
     assert join_split_letters("שעברו ב-2025 ו-2857") == "שעברו ב-2025 ו-2857"
+
+
+def test_narrative_without_headings_is_still_rendered():
+    """A letter whose narrative has no 'NNNNNN:' headings must still show עיקרי הפנייה."""
+    sample = _sample()
+    sample["fields"] = sample["fields"].model_copy(update={"request_summary": "פסקה ראשונה.\nתיאור התוכנית: משהו.\nמטרת השינוי: אחר."})
+    html = Reports().render_summary_html(**sample)
+    assert "עיקרי הפנייה" in html and "פסקה ראשונה." in html
