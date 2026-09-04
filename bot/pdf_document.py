@@ -30,6 +30,7 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 
 import pandas as pd
@@ -106,8 +107,8 @@ class PdfDocument:
     def _open(self):
         return pdfplumber.open(self._as_openable(self.source))
 
-    def _is_header_page(self, page) -> bool:
-        """True if the page contains HEADER (i.e. a budget-table page).
+    def _is_header_text(self, raw: str) -> bool:
+        """True if a page's raw text contains HEADER (i.e. a budget-table page).
 
         pdfplumber doesn't apply bidi reordering, so Hebrew lines come out
         character-reversed; reverse each line back before searching for HEADER.
@@ -115,7 +116,7 @@ class PdfDocument:
         entirely (not just collapsed) before comparing.
         """
         normalized_header = "".join(self.HEADER.split())
-        lines = (line[::-1] for line in (page.extract_text() or "").splitlines())
+        lines = (line[::-1] for line in raw.splitlines())
         page_text = "".join("".join(lines).split())
         return normalized_header in page_text
 
@@ -144,16 +145,40 @@ class PdfDocument:
         """Correct one raw pdfplumber line: reverse it (fixes Hebrew) then fix the numbers."""
         return cls._fix_numbers(line[::-1])
 
+    # ---- the single parse ----
+
+    # Table extraction is pdfplumber's slow part (minutes over a 378-page letter), so it
+    # runs only on pages that carry tables anyone reads: the budget-table pages (HEADER)
+    # and the appendix pages (the history marker). Text is extracted for every page.
+    TABLE_PAGE_MARKERS = ("היסטוריה תקציבית",)
+
+    @cached_property
+    def _parsed(self) -> list[tuple[str, str, list]]:
+        """ONE pass over the PDF, kept for the document's lifetime.
+
+        Returns (raw text, bidi-corrected text, raw tables) per page. Every accessor
+        below (text, raw_text, pages, header tables) derives from this, so the file is
+        opened and read exactly once no matter how many times they are used.
+        """
+        with self._open() as pdf:
+            if not pdf.pages:
+                raise ValueError("PDF has no pages")
+            parsed = []
+            for page in pdf.pages:
+                raw = page.extract_text() or ""
+                fixed = "\n".join(self._fix_line(line) for line in raw.splitlines())
+                wants_tables = self._is_header_text(raw) or any(
+                    marker in fixed for marker in self.TABLE_PAGE_MARKERS)
+                tables = (page.extract_tables(self.TABLE_SETTINGS) or []) if wants_tables else []
+                parsed.append((raw, fixed, tables))
+        return parsed
+
     # ---- text ----
 
     @property
     def text(self) -> str:
         """Every page's text in correct reading order (Hebrew and numbers both fixed)."""
-        with self._open() as pdf:
-            return "\n".join(
-                "\n".join(self._fix_line(line) for line in (page.extract_text() or "").splitlines())
-                for page in pdf.pages
-            )
+        return "\n".join(fixed for _, fixed, _ in self._parsed)
 
     @property
     def raw_text(self) -> str:
@@ -162,42 +187,28 @@ class PdfDocument:
         Used for reading left-to-right content such as URLs, which come out correct
         in the raw text but backwards in the bidi-corrected text.
         """
-        with self._open() as pdf:
-            return "\n".join((page.extract_text() or "") for page in pdf.pages)
+        return "\n".join(raw for raw, _, _ in self._parsed)
 
     @property
     def pages(self) -> list[PageData]:
-        """Per-page bidi-corrected text plus that page's raw tables."""
-        result: list[PageData] = []
-        with self._open() as pdf:
-            for page in pdf.pages:
-                text = "\n".join(
-                    self._fix_line(line) for line in (page.extract_text() or "").splitlines()
-                )
-                raw_tables = page.extract_tables(self.TABLE_SETTINGS) or []
-                clean_tables = [
-                    [[self._clean_cell(cell) for cell in row] for row in table]
-                    for table in raw_tables
-                ]
-                result.append(PageData(text=text, tables=clean_tables))
-        return result
+        """Per-page bidi-corrected text plus that page's raw tables (cleaned cells)."""
+        return [
+            PageData(
+                text=fixed,
+                tables=[[[self._clean_cell(cell) for cell in row] for row in table]
+                        for table in tables],
+            )
+            for _, fixed, tables in self._parsed
+        ]
 
     # ---- tables ----
 
     def _header_page_tables(self) -> list[list[list[str | None]]]:
         """Return all raw tables found on every page that contains HEADER."""
-        with self._open() as pdf:
-            if not pdf.pages:
-                raise ValueError("PDF has no pages")
-
-            header_pages = [page for page in pdf.pages if self._is_header_page(page)]
-            if not header_pages:
-                raise ValueError(f"Header '{self.HEADER}' not found in any page of the PDF")
-
-            tables = []
-            for page in header_pages:
-                tables.extend(page.extract_tables(self.TABLE_SETTINGS) or [])
-        return tables
+        header_tables = [tables for raw, _, tables in self._parsed if self._is_header_text(raw)]
+        if not header_tables:
+            raise ValueError(f"Header '{self.HEADER}' not found in any page of the PDF")
+        return [table for tables in header_tables for table in tables]
 
     @classmethod
     def _clean_cell(cls, cell) -> str:
