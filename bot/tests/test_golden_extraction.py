@@ -2,7 +2,7 @@
 
 The offline test exercises the Agent's deterministic tools on the saved raw text (no
 network/LLM). The end-to-end test runs the whole Agent (incl. the one coalition LLM
-call) on 21658's local PDF; it skips without an API key (there is no deterministic
+call) on 21658's local PDF; it skips without an API key for the configured provider (there is no deterministic
 fallback for coalition_funds).
 """
 import os
@@ -21,9 +21,26 @@ from common.config_manager import ConfigManager  # noqa: E402
 from agent import Agent, MASTER_COLUMN  # noqa: E402
 
 MASTER = os.path.join(_ROOT, "files", "master.xlsx")
-PDF_21658 = os.path.join(_ROOT, "files", "outputs", "21658_original.pdf")
+PDF_21658 = os.path.join(_ROOT, "bot", "tests", "test_files", "21658_original.pdf")
 RAW_21658 = os.path.join(os.path.dirname(__file__), "fixtures", "golden", "21658_raw.txt")
-_HAS_KEY = bool(os.getenv("OPENAI_API_KEY"))
+CONFIG = os.path.join(_ROOT, "files", "config.json")
+
+
+def _agent() -> Agent:
+    """The Agent as the app builds it: provider/model/key from files/config.json (+ .env);
+    falls back to the OpenAI defaults when no local config exists."""
+    if os.path.isfile(CONFIG):
+        return Agent.from_config(ConfigManager(CONFIG), MASTER)
+    return Agent(ConfigManager.read_master_programs(MASTER))
+
+
+def _has_key() -> bool:
+    if os.path.isfile(CONFIG):
+        return bool(ConfigManager(CONFIG).get_api_key())
+    return bool(os.getenv("OPENAI_API_KEY"))
+
+
+_HAS_KEY = _has_key()
 
 
 @pytest.mark.skipif(not os.path.isfile(RAW_21658), reason="21658 raw text not present")
@@ -39,11 +56,10 @@ def test_program_number_includes_programs_from_summary_and_breakdown():
 
 
 @pytest.mark.skipif(not (os.path.isfile(PDF_21658) and _HAS_KEY),
-                    reason="21658 PDF or OPENAI_API_KEY not present")
+                    reason="21658 PDF or LLM API key (configured provider) not present")
 def test_agent_extract_21658():
     """The whole Agent — deterministic fields + the one coalition LLM call + master."""
-    master = ConfigManager.read_master_programs(MASTER)
-    result = Agent(master).extract(PDF_21658)
+    result = _agent().extract(PDF_21658)
 
     # deterministic fields
     assert result.fields.date == "01/07/2026"

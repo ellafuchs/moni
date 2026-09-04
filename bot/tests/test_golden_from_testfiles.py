@@ -4,7 +4,7 @@ Each test_files PDF whose request has a golden fixture (bot/tests/fixtures/golde
 <req>.json) becomes a parametrized case. The deterministic test runs offline (no
 network, no LLM) and checks the fields the Agent derives without the model; the
 full-extraction test runs the whole Agent (incl. the one coalition LLM call) and
-is skipped without an OPENAI_API_KEY.
+is skipped without an API key for the provider set in files/config.json.
 """
 import json
 import os
@@ -27,7 +27,24 @@ from budget_letter import BudgetLetter  # noqa: E402
 MASTER = os.path.join(_ROOT, "files", "master.xlsx")
 TEST_FILES = os.path.join(os.path.dirname(__file__), "test_files")
 GOLDEN = os.path.join(os.path.dirname(__file__), "fixtures", "golden")
-_HAS_KEY = bool(os.getenv("OPENAI_API_KEY"))
+CONFIG = os.path.join(_ROOT, "files", "config.json")
+
+
+def _agent() -> Agent:
+    """The Agent as the app builds it: provider/model/key from files/config.json (+ .env);
+    falls back to the OpenAI defaults when no local config exists."""
+    if os.path.isfile(CONFIG):
+        return Agent.from_config(ConfigManager(CONFIG), MASTER)
+    return Agent(ConfigManager.read_master_programs(MASTER))
+
+
+def _has_key() -> bool:
+    if os.path.isfile(CONFIG):
+        return bool(ConfigManager(CONFIG).get_api_key())
+    return bool(os.getenv("OPENAI_API_KEY"))
+
+
+_HAS_KEY = _has_key()
 
 
 def _cases():
@@ -72,12 +89,11 @@ def test_deterministic_fields_match_golden(req, pdf, golden):
 
 
 @pytest.mark.skipif(not (CASES and _HAS_KEY),
-                    reason="test_files fixtures or OPENAI_API_KEY not present")
+                    reason="test_files fixtures or LLM API key (configured provider) not present")
 @pytest.mark.parametrize("req,pdf,golden", CASES, ids=IDS)
 def test_full_extraction_matches_golden(req, pdf, golden):
     """The whole Agent, incl. the one coalition LLM call — needs an API key."""
-    master = ConfigManager.read_master_programs(MASTER)
-    result = Agent(master).extract(pdf)
+    result = _agent().extract(pdf)
 
     assert result.fields.date == golden["text"]["date"]
     assert result.fields.staffing_changes == golden["text"]["staffing_changes"]
