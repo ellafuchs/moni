@@ -1,12 +1,32 @@
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+from dotenv import load_dotenv
+
+# Read the project-root .env (if any) so secrets are available to the web app,
+# the bot and the tests alike. Never overrides variables already in the environment.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
 class ConfigManager:
-    """Manages application configuration"""
+    """Manages application configuration.
+
+    config.json holds ONLY non-secret data: mailing list, model name/provider, the
+    master-file snapshot, the schedule and the program codes.
+
+    Secrets come ONLY from the environment (loaded from the project-root .env) and are
+    never read from or written to config.json. Any secret key found in an old
+    config.json is ignored and dropped on the next save.
+      OPENAI_API_KEY        -> get_api_key()  (model_provider openai / unset)
+      GEMINI_API_KEY        -> get_api_key()  (model_provider google_genai)
+      MONI_SENDER           -> get_notifier_email()
+      GOOGLE_CLIENT_ID      -> get_google_client_id()
+      GOOGLE_CLIENT_SECRET  -> get_google_client_secret()
+      GOOGLE_REFRESH_TOKEN  -> get_google_refresh_token()
+    """
 
     PROGRAMS_SHEET = "תוכניות"
     KEY = "קוד"
@@ -16,12 +36,9 @@ class ConfigManager:
         # Initialise values
         self.path = path
         self.ids: dict[str, str] = {}
-        self.api_key: str | None = None
         self.model_name: str | None = None
         self.model_provider: str | None = None
         self.mailing_list: list[str] | None = None
-        self.notifier_email: str | None = None
-        self.notifier_password: str | None = None
         self.last_master_update: str | None = None
         self.last_master_filename: str | None = None
         self.schedule: list[dict] | None = None
@@ -36,30 +53,22 @@ class ConfigManager:
         with open(self.path) as f:
             config = json.load(f)
 
-        self.api_key = config.get("api_key")
         self.model_name = config.get("model_name")
         self.model_provider = config.get("model_provider")
-        self.mailing_list = list(config.get("mailing_list"))
-        self.notifier_email = config.get("notifier").get("email")
-        self.notifier_password = config.get("notifier").get("password")
+        self.mailing_list = list(config.get("mailing_list") or [])
         self.last_master_update = config.get("last_master_update")
         self.last_master_filename = config.get("last_master_filename")
         self.schedule = config.get("schedule")
 
         self.ids = {}
-        for program in config.get("programs"):
+        for program in config.get("programs") or []:
             self.ids[program.get("key")] = program.get("name")
 
     def _save(self) -> None:
         config = {
-            "api_key": self.api_key,
             "model_name": self.model_name,
             "model_provider": self.model_provider,
             "mailing_list": self.mailing_list,
-            "notifier": {
-                "email": self.notifier_email,
-                "password": self.notifier_password,
-            },
             "last_master_update": self.last_master_update,
             "last_master_filename": self.last_master_filename,
             "schedule": self.schedule,
@@ -72,12 +81,18 @@ class ConfigManager:
         with open(self.path, "w") as f:
             json.dump(config, f, indent=2)
 
-    def get_api_key(self) -> str | None:
-        return self.api_key
+    API_KEY_ENV_BY_PROVIDER = {
+        "openai": "OPENAI_API_KEY",
+        "google_genai": "GEMINI_API_KEY",
+    }
 
-    def set_api_key(self, key: str) -> str | None:
-        self.api_key = key
-        self._save()
+    def get_api_key(self) -> str | None:
+        """The LLM key for the configured provider, from the environment / .env only.
+
+        Never read from or written to config.json. Unknown/unset provider -> OpenAI.
+        """
+        env_var = self.API_KEY_ENV_BY_PROVIDER.get(self.model_provider or "openai", "OPENAI_API_KEY")
+        return os.environ.get(env_var) or None
 
     def get_model_name(self) -> str | None:
         return self.model_name
@@ -100,19 +115,25 @@ class ConfigManager:
         self.mailing_list = mailing_list
         self._save()
 
-    def get_notifier_email(self) -> str | None:
-        return self.notifier_email
+    @staticmethod
+    def get_notifier_email() -> str | None:
+        """Sending Gmail address, from MONI_SENDER in the environment / .env only."""
+        return os.environ.get("MONI_SENDER") or None
 
-    def set_notifier_email(self, notifier_email: str) -> None:
-        self.notifier_email = notifier_email
-        self._save()
+    @staticmethod
+    def get_google_client_id() -> str | None:
+        """OAuth client id from the Google Cloud Console (GOOGLE_CLIENT_ID)."""
+        return os.environ.get("GOOGLE_CLIENT_ID") or None
 
-    def get_notifier_password(self) -> str | None:
-        return self.notifier_password
+    @staticmethod
+    def get_google_client_secret() -> str | None:
+        """OAuth client secret from the Google Cloud Console (GOOGLE_CLIENT_SECRET)."""
+        return os.environ.get("GOOGLE_CLIENT_SECRET") or None
 
-    def set_notifier_password(self, notifier_password: str) -> None:
-        self.notifier_password = notifier_password
-        self._save()
+    @staticmethod
+    def get_google_refresh_token() -> str | None:
+        """Refresh token written by bot/gmail_auth.py (GOOGLE_REFRESH_TOKEN)."""
+        return os.environ.get("GOOGLE_REFRESH_TOKEN") or None
 
     def get_last_master(self) -> dict:
         return {

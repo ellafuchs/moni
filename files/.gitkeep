@@ -1,0 +1,2 @@
+Runtime data lives here and is not committed: config.json, master.xlsx, outputs/.
+See .env.example and docs/architecture.html.

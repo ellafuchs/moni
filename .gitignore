@@ -7,8 +7,9 @@ __pycache__/
 output/
 config.json
 
-# Local runtime data, generated output, and secrets (files/config.json holds credentials)
-files/
+# Local runtime data and generated output: keep the folder, ignore everything in it
+files/*
+!files/.gitkeep
 
 # Local agent/skill tooling and scratch notes
 .claude/
