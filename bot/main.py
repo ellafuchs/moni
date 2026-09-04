@@ -5,11 +5,16 @@ The pipeline reads top-to-bottom in main():
   2. extract   — one Agent reads each letter's fields + budget table (with a `master`
                  column) and decides relevance (does any code match the master set?)
   3. render    — write a summary PDF for each relevant letter
-  4. email     — send the PDFs to the mailing list (currently disabled)
+  4. email     — send the PDFs to the mailing list
 
-Config (API key, model/provider, mailing list, notifier credentials) comes from
-files/config.json; the master program-code set comes from files/master.xlsx.
+    uv run python bot/main.py                      # email the config.json mailing list
+    uv run python bot/main.py --to me@example.com  # test run: email only this address
+    uv run python bot/main.py --no-email           # render PDFs, send nothing
+
+Non-secret config (model, mailing list, schedule) comes from files/config.json; secrets
+(OpenAI key, Gmail OAuth) from .env; the master program-code set from files/master.xlsx.
 """
+import argparse
 import logging
 import os
 import shutil
@@ -70,23 +75,46 @@ def render_summary(result, slug: str, output_dir: Path,
     return (pdf_path, f"{slug}_summary")
 
 
-def email_reports(config, path_names) -> None:
-    """Attach every rendered PDF and email them to the configured mailing list."""
+EMAIL_SUBJECT = "סיכום מכתבי העברה תקציבית"
+EMAIL_BODY = "מצורפים סיכומי מכתבי ההעברה התקציבית הרלוונטיים לתוכניות הקרן."
+
+
+def parse_args(argv=None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the budget-letter pipeline.")
+    parser.add_argument(
+        "--to", action="append", metavar="EMAIL",
+        help="send the report to this address instead of the config.json mailing list "
+             "(repeat for several addresses)")
+    parser.add_argument(
+        "--no-email", action="store_true",
+        help="render the summary PDFs but do not send any email")
+    return parser.parse_args(argv)
+
+
+def resolve_recipients(override: list[str] | None, mailing_list: list[str] | None) -> list[str]:
+    """--to wins over the config mailing list; never None."""
+    return list(override or mailing_list or [])
+
+
+def email_reports(sender: str | None, recipients: list[str], path_names) -> bool:
+    """Attach every rendered PDF and email them. Returns True iff an email was sent."""
+    if not path_names:
+        logger.info("no relevant letters were rendered, nothing to send")
+        return False
+    if not recipients:
+        logger.warning("no recipients (mailing list empty and no --to), nothing sent")
+        return False
     attachments = []
     for path, name in path_names:
         with open(path, "rb") as f:
             attachments.append(Attachment(f.read(), f"{name}.pdf"))
-    send_email(
-        config.get_notifier_email(),
-        config.get_notifier_password(),
-        config.get_mailing_list(),
-        "Report!!",
-        "Here is your budget-letter report.",
-        attachments,
-    )
+    send_email(sender, recipients, EMAIL_SUBJECT, EMAIL_BODY, attachments)
+    logger.info("emailed %d PDF(s) to %s", len(attachments), ", ".join(recipients))
+    return True
 
 
-def main() -> None:
+def main(argv=None) -> None:
+    args = parse_args(argv)
     config = ConfigManager(CONFIG_PATH)
     # Sync config's `programs` list from the master file, then use that dict.
     config.load_master(MASTER_PATH)
@@ -129,8 +157,15 @@ def main() -> None:
         if rendered:
             path_names.append(rendered)
 
-    # 4. email — send the PDFs to the mailing list.
-    # email_reports(config, path_names)
+    # 4. email — send the PDFs to the mailing list (or to --to for a test run).
+    if args.no_email:
+        logger.info("--no-email: %d PDF(s) rendered, nothing sent", len(path_names))
+    else:
+        email_reports(
+            config.get_notifier_email(),
+            resolve_recipients(args.to, config.get_mailing_list()),
+            path_names,
+        )
 
 
 if __name__ == "__main__":
