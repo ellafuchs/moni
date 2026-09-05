@@ -77,3 +77,18 @@ def test_load_processed_ignores_a_broken_file(tmp_path):
 def test_parse_args_all_flag():
     assert main.parse_args(["--all"]).all is True
     assert main.parse_args([]).all is False
+
+
+def test_email_subject_is_title_plus_run_date():
+    from datetime import date
+    paths = [("a.pdf", "21703_summary"), ("b.pdf", "21772_summary")]
+    assert main.email_subject(paths, date(2026, 9, 5)) == "סיכום פנייה תקציבית 05.09.2026"
+    assert main.email_subject([], date(2026, 9, 5)) == "סיכום פנייה תקציבית 05.09.2026"
+
+
+def test_email_body_lists_every_request_number():
+    body = main.email_body([("a.pdf", "21703_summary"), ("b.pdf", "21772_summary")])
+    assert "פניות בסיכום זה (2):" in body
+    assert "• 21703" in body and "• 21772" in body
+    assert "21703_summary" not in body
+    assert main.email_body([("a.pdf", "21703_summary")]).count("פנייה בסיכום זה (1):") == 1

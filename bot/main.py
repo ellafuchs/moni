@@ -115,13 +115,22 @@ def render_summary(result, slug: str, output_dir: Path,
 
 
 EMAIL_SUBJECT = "סיכום פנייה תקציבית"
-EMAIL_BODY = ("מצורף סיכום אוטומטי של פנייה תקציבית הרלוונטית לתוכניות הקרן, "
-              "כ-PDF וכדף HTML (בו הקישורים לחיצים).")
 
 
-def email_subject(path_names) -> str:
+def email_subject(path_names, today: date | None = None) -> str:
+    """'סיכום פנייה תקציבית DD.MM.YYYY': the date of the run, no request numbers."""
+    return f"{EMAIL_SUBJECT} {(today or date.today()).strftime('%d.%m.%Y')}"
+
+
+def email_body(path_names) -> str:
+    """The request numbers go in the body, one per line, so the subject stays short."""
     ids = [name.removesuffix("_summary") for _, name in path_names]
-    return f"{EMAIL_SUBJECT} {', '.join(ids)}" if ids else EMAIL_SUBJECT
+    head = ("מצורף סיכום אוטומטי של פניות תקציביות הרלוונטיות לתוכניות הקרן, "
+            "כל פנייה כ-PDF וכדף HTML (בו הקישורים לחיצים).")
+    if not ids:
+        return head
+    plural = "פניות" if len(ids) > 1 else "פנייה"
+    return head + f"\n\n{plural} בסיכום זה ({len(ids)}):\n" + "\n".join(f"• {i}" for i in ids)
 
 
 def parse_args(argv=None) -> argparse.Namespace:
@@ -159,7 +168,7 @@ def email_reports(sender: str | None, recipients: list[str], path_names) -> bool
         html = Path(path).with_suffix(".html")
         if html.is_file():  # the same page as HTML — clickable links, easy to forward
             attachments.append(Attachment(html.read_bytes(), f"{name}.html"))
-    send_email(sender, recipients, email_subject(path_names), EMAIL_BODY, attachments)
+    send_email(sender, recipients, email_subject(path_names), email_body(path_names), attachments)
     logger.info("emailed %d PDF(s) to %s", len(attachments), ", ".join(recipients))
     return True
 
