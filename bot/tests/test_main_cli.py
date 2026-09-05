@@ -54,3 +54,26 @@ def test_email_reports_skips_without_recipients(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "send_email", lambda *a: calls.append(a))
     assert main.email_reports("me@example.com", [], [(str(pdf), "x_summary")]) is False
     assert calls == []
+
+
+def test_processed_memory_round_trip(tmp_path):
+    path = tmp_path / "processed.json"
+    assert main.load_processed(path) == {}
+    processed = {}
+    main.remember_processed(processed, "21705", True, path)
+    main.remember_processed(processed, "21687", False, path)
+    again = main.load_processed(path)
+    assert set(again) == {"21705", "21687"}
+    assert again["21705"]["relevant"] is True and again["21687"]["relevant"] is False
+    assert again["21705"]["date"]
+
+
+def test_load_processed_ignores_a_broken_file(tmp_path):
+    path = tmp_path / "processed.json"
+    path.write_text("{not json", encoding="utf-8")
+    assert main.load_processed(path) == {}
+
+
+def test_parse_args_all_flag():
+    assert main.parse_args(["--all"]).all is True
+    assert main.parse_args([]).all is False

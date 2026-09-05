@@ -36,6 +36,7 @@ def run(source: str, *, rerender: bool = False):
         api_key=config.get_api_key(),
         model=config.get_model_name(),
         provider=config.get_model_provider(),
+        fallback_model=config.get_model_fallback(),
     )
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 

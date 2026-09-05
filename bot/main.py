@@ -10,15 +10,21 @@ The pipeline reads top-to-bottom in main():
     uv run python bot/main.py                      # email the config.json mailing list
     uv run python bot/main.py --to me@example.com  # test run: email only this address
     uv run python bot/main.py --no-email           # render PDFs, send nothing
+    uv run python bot/main.py --all                # re-read letters already handled
+
+Letters already handled are remembered in files/outputs/processed.json and skipped on
+the next run, so a daily run touches only what is new; --all ignores that memory.
 
 Non-secret config (model, mailing list, schedule) comes from files/config.json; secrets
 (OpenAI key, Gmail OAuth) from .env; the master program-code set from files/master.xlsx.
 """
 import argparse
+import json
 import logging
 import os
 import shutil
 import sys
+from datetime import date
 from pathlib import Path
 
 # Make the project root importable so `common` can be found.
@@ -46,6 +52,23 @@ FALLBACK_URL = (
     "https://fs.knesset.gov.il/globaldocs/FINANCE/0e793046-014d-f111-a13e-005056aa7c52/"
     "4_0e793046-014d-f111-a13e-005056aa7c52_13_21560.pdf"
 )
+PROCESSED_PATH = OUTPUT_DIR / "processed.json"
+
+
+def load_processed(path: Path = PROCESSED_PATH) -> dict:
+    """{slug: {"date": ..., "relevant": bool}} of letters already handled; {} if none."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def remember_processed(processed: dict, slug: str, relevant: bool,
+                       path: Path = PROCESSED_PATH) -> None:
+    """Record one handled letter and write the memory back right away."""
+    processed[slug] = {"date": date.today().isoformat(), "relevant": relevant}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(processed, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def render_summary(result, slug: str, output_dir: Path,
@@ -110,6 +133,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument(
         "--no-email", action="store_true",
         help="render the summary PDFs but do not send any email")
+    parser.add_argument(
+        "--all", action="store_true",
+        help="handle every letter in the feed, even ones remembered as already handled")
     return parser.parse_args(argv)
 
 
@@ -150,6 +176,7 @@ def main(argv=None) -> None:
         api_key=config.get_api_key(),
         model=config.get_model_name(),
         provider=config.get_model_provider(),
+        fallback_model=config.get_model_fallback(),
     )
 
     # 1. aggregate — candidate letter URLs (fall back to one URL when offline).
@@ -157,14 +184,19 @@ def main(argv=None) -> None:
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+    processed = {} if args.all else load_processed()
     path_names = []
     for url in urls:
         slug = _slug(url)
+        if slug in processed:
+            logger.info("%s: already handled on %s, skipped", slug, processed[slug].get("date"))
+            continue
         try:
             result = extractor.extract(url)
         except Exception:  # noqa: BLE001 - skip unreadable PDFs, keep the run going
-            logger.warning("%s: skipped, could not extract", slug)
+            logger.warning("%s: skipped, could not extract (will retry next run)", slug)
             continue
+        remember_processed(processed, slug, result.relevant)
 
         # 2. the master check — only summarize letters that touch a master code.
         if not result.relevant:

@@ -38,6 +38,7 @@ class ConfigManager:
         self.ids: dict[str, str] = {}
         self.model_name: str | None = None
         self.model_provider: str | None = None
+        self.model_fallback: str | None = None
         self.mailing_list: list[str] | None = None
         self.last_master_update: str | None = None
         self.last_master_filename: str | None = None
@@ -55,6 +56,7 @@ class ConfigManager:
 
         self.model_name = config.get("model_name")
         self.model_provider = config.get("model_provider")
+        self.model_fallback = config.get("model_fallback")
         self.mailing_list = list(config.get("mailing_list") or [])
         self.last_master_update = config.get("last_master_update")
         self.last_master_filename = config.get("last_master_filename")
@@ -68,6 +70,7 @@ class ConfigManager:
         config = {
             "model_name": self.model_name,
             "model_provider": self.model_provider,
+            "model_fallback": self.model_fallback,
             "mailing_list": self.mailing_list,
             "last_master_update": self.last_master_update,
             "last_master_filename": self.last_master_filename,
@@ -103,6 +106,14 @@ class ConfigManager:
 
     def get_model_provider(self) -> str | None:
         return self.model_provider
+
+    def get_model_fallback(self) -> str | None:
+        """A second model of the same provider, used only when the first one is out of quota."""
+        return self.model_fallback
+
+    def set_model_fallback(self, model_fallback: str | None) -> None:
+        self.model_fallback = model_fallback or None
+        self._save()
 
     def set_model_provider(self, model_provider: str) -> None:
         self.model_provider = model_provider

@@ -103,11 +103,14 @@ class Agent:
         "מספרים (למשל טבלת סיכום קואליציונית המסתיימת ב'סה\"כ'), את מקטע הקישורים ואת החתימה."
     )
 
-    def __init__(self, master_programs, *, api_key=None, model=None, provider=None):
+    def __init__(self, master_programs, *, api_key=None, model=None, provider=None,
+                 fallback_model=None):
         self.master = set(master_programs)
         self.api_key = api_key
         self.provider = provider
         self.model = model or DEFAULT_MODELS.get(provider or "openai", DEFAULT_MODEL)
+        # Same provider, second daily quota: tried once when the first model is exhausted.
+        self.fallback_model = fallback_model if fallback_model != self.model else None
 
     @classmethod
     def from_config(cls, config, master_path: str) -> "Agent":
@@ -121,6 +124,7 @@ class Agent:
             api_key=config.get_api_key(),
             model=config.get_model_name(),
             provider=config.get_model_provider(),
+            fallback_model=config.get_model_fallback(),
         )
 
     # ------------------------------------------------------------------ entry
@@ -248,16 +252,28 @@ class Agent:
 
     # ------------------------------------------------------- the one LLM call
     def _analyze(self, region: str):
-        """The ONE LLM call over the narrative region — NO fallback.
+        """The ONE LLM call over the narrative region.
 
         Returns (coalition 'כן'/'לא', reason, request text, usage dict). An empty region
-        (no narrative) is ('לא', '', '', None) with no call. Otherwise the model returns the
-        coalition judgment and where the narrative ends; if the model is unavailable the
-        error surfaces — it is not masked by a deterministic answer.
+        (no narrative) is ('לא', '', '', None) with no call. If the model is out of daily
+        quota and a fallback model is configured, the same call is made once more on the
+        fallback; any other error surfaces — it is not masked by a deterministic answer.
         """
         if not region:
             return "לא", "", "", None
+        try:
+            result, model = self._invoke(self.model, region), self.model
+        except Exception as exc:  # noqa: BLE001 - only a quota error is retried
+            if not (self.fallback_model and self._is_quota_error(exc)):
+                raise
+            logger.warning("%s is out of quota, retrying on %s", self.model, self.fallback_model)
+            result, model = self._invoke(self.fallback_model, region), self.fallback_model
+        parsed = result["parsed"]
+        coalition = "כן" if "כן" in (parsed.coalition_funds or "").strip() else "לא"
+        return (coalition, (parsed.coalition_reason or "").strip(),
+                (parsed.request_summary or "").strip(), self._usage(result.get("raw"), model))
 
+    def _invoke(self, model: str, region: str):
         from langchain.chat_models import init_chat_model
 
         params: dict = {"temperature": 0, "max_retries": 3}
@@ -265,22 +281,25 @@ class Agent:
             params["api_key"] = self.api_key
         if self.provider:
             params["model_provider"] = self.provider
-        llm = init_chat_model(self.model, **params).with_structured_output(
+        llm = init_chat_model(model, **params).with_structured_output(
             _Analysis, include_raw=True)
-        result = llm.invoke([("system", self._ANALYSIS_SYSTEM), ("user", region)])
-        parsed = result["parsed"]
-        coalition = "כן" if "כן" in (parsed.coalition_funds or "").strip() else "לא"
-        return (coalition, (parsed.coalition_reason or "").strip(),
-                (parsed.request_summary or "").strip(), self._usage(result.get("raw")))
+        return llm.invoke([("system", self._ANALYSIS_SYSTEM), ("user", region)])
 
-    def _usage(self, raw) -> dict:
+    @staticmethod
+    def _is_quota_error(exc: Exception) -> bool:
+        """Google's daily free-tier limit (429 RESOURCE_EXHAUSTED) or OpenAI's 'insufficient_quota'."""
+        text = f"{type(exc).__name__}: {exc}"
+        return "RESOURCE_EXHAUSTED" in text or "insufficient_quota" in text or " 429" in text
+
+    def _usage(self, raw, model: str | None = None) -> dict:
         """Token counts + a rough USD cost estimate from the raw AIMessage."""
+        model = model or self.model
         meta = getattr(raw, "usage_metadata", None) or {}
         in_tok = meta.get("input_tokens", 0)
         out_tok = meta.get("output_tokens", 0)
-        rate = PRICING_USD_PER_1M.get(self.model)
+        rate = PRICING_USD_PER_1M.get(model)
         cost = (in_tok * rate[0] + out_tok * rate[1]) / 1_000_000 if rate else None
-        return {"model": self.model, "input_tokens": in_tok,
+        return {"model": model, "input_tokens": in_tok,
                 "output_tokens": out_tok, "cost_usd": cost}
 
     # ------------------------------------------------------- table + master

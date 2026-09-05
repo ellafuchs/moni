@@ -4,6 +4,7 @@ from flask import Flask, send_from_directory
 
 from common.config_manager import ConfigManager
 from web.routes import register_routes
+from web import scheduler
 
 PUBLIC_DIR = Path(__file__).resolve().parent.parent / "public"
 FILES_DIR = Path("./files")
@@ -13,6 +14,7 @@ app.config["config_manager"] = ConfigManager("./files/config.json")
 app.config["files_dir"] = FILES_DIR
 
 register_routes(app)
+scheduler.start(app)
 
 
 @app.route("/")
