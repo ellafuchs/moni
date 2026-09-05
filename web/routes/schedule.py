@@ -25,3 +25,12 @@ def post_schedule():
         return error_response("כל טווח תאריכים חייב להיות אובייקט תקין.")
     config.set_schedule(data)
     return jsonify({"status": "ok"}), 201
+
+
+@schedule_bp.route("/status", methods=["GET"])
+def schedule_status():
+    """What the scheduler did last, so the page can show it."""
+    sched = current_app.config.get("scheduler")
+    if sched is None:
+        return jsonify({"active": False, "last_run": None, "running": False})
+    return jsonify({"active": sched.is_alive(), "last_run": sched.last_run, "running": sched.running})

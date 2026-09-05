@@ -19,6 +19,7 @@ def get_llm():
             "api_key_set": bool(config.get_api_key()),
             "model_name": config.get_model_name() or "",
             "model_provider": config.get_model_provider() or "openai",
+            "model_fallback": config.get_model_fallback() or "",
         }
     )
 
@@ -38,4 +39,6 @@ def post_llm():
             return error_response("ספק לא נתמך. אפשרויות: openai, google_genai.")
         config.set_model_provider(provider)
     config.set_model_name(model_name)
+    if "model_fallback" in data:
+        config.set_model_fallback(data.get("model_fallback") or None)
     return jsonify({"status": "ok"}), 201
