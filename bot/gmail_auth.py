@@ -15,20 +15,15 @@ bot/notifier.py can send mail without any password.
 """
 import os
 import sys
-from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dotenv import find_dotenv, load_dotenv, set_key
+from dotenv import set_key
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-from common.config_manager import ConfigManager
+from common.config_manager import ENV_PATH, ConfigManager
 from notifier import GMAIL_SEND_SCOPE, TOKEN_URI
 
-# Let python-dotenv find the .env file (an absolute path, wherever it is up the tree);
-# the project root is only the fallback for the first run, when no .env exists yet.
-ENV_PATH = Path(find_dotenv() or Path(__file__).resolve().parent.parent / ".env")
-load_dotenv(ENV_PATH)
 
 
 def main() -> int:

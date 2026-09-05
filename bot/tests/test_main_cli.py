@@ -6,6 +6,8 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__
 sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, "bot"))
 
+import pytest  # noqa: E402
+
 import main  # noqa: E402
 
 
@@ -54,3 +56,23 @@ def test_email_reports_skips_without_recipients(tmp_path, monkeypatch):
     monkeypatch.setattr(main, "send_email", lambda *a: calls.append(a))
     assert main.email_reports("me@example.com", [], [(str(pdf), "x_summary")]) is False
     assert calls == []
+
+
+def test_run_stops_before_any_work_when_gmail_is_not_configured(monkeypatch):
+    from notifier import GmailNotConfigured
+    monkeypatch.setattr(main, "gmail_credentials",
+                        lambda: (_ for _ in ()).throw(GmailNotConfigured("missing GOOGLE_REFRESH_TOKEN")))
+    asked_for_letters = []
+    monkeypatch.setattr(main, "get_pdf_urls", lambda: asked_for_letters.append(1) or [])
+    with pytest.raises(GmailNotConfigured):
+        main.main([])
+    assert asked_for_letters == []
+
+
+def test_no_email_run_does_not_touch_gmail(monkeypatch):
+    checked = []
+    monkeypatch.setattr(main, "gmail_credentials", lambda: checked.append(1))
+    monkeypatch.setattr(main, "ConfigManager", lambda path: (_ for _ in ()).throw(RuntimeError("stop here")))
+    with pytest.raises(RuntimeError, match="stop here"):
+        main.main(["--no-email"])
+    assert checked == []
