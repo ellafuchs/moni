@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import agent
 from aggregator import get_pdf_urls
 from common.config_manager import ConfigManager
-from notifier import Attachment, send_email
+from notifier import Attachment, gmail_credentials, send_email
 from reports import Reports
 from utils_function import _slug
 
@@ -175,6 +175,9 @@ def email_reports(sender: str | None, recipients: list[str], path_names) -> bool
 
 def main(argv=None) -> None:
     args = parse_args(argv)
+    if not args.no_email:
+        # Fail fast: check the Gmail OAuth values before spending LLM calls on letters we can't send.
+        gmail_credentials()
     config = ConfigManager(CONFIG_PATH)
     # Sync config's `programs` list from the master file, then use that dict.
     config.load_master(MASTER_PATH)

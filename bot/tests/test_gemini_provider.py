@@ -48,8 +48,10 @@ def test_agent_default_model_follows_provider():
 
 def test_agent_from_config_passes_provider_and_gemini_key(tmp_path, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "AIza-gemini")
+    # Don't depend on the gitignored files/master.xlsx: the master set is not what's under test.
+    monkeypatch.setattr(ConfigManager, "read_master_programs", staticmethod(lambda path: {"000001": "x"}))
     cfg = _config(tmp_path, provider="google_genai")
-    a = agent.Agent.from_config(cfg, os.path.join(_ROOT, "files", "master.xlsx"))
+    a = agent.Agent.from_config(cfg, "unused-master.xlsx")
     assert a.provider == "google_genai"
     assert a.api_key == "AIza-gemini"
     assert a.model == agent.DEFAULT_MODELS["google_genai"]

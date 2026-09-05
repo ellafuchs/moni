@@ -4,11 +4,12 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
-# Read the project-root .env (if any) so secrets are available to the web app,
-# the bot and the tests alike. Never overrides variables already in the environment.
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# One .env resolution for the whole app (bot, web, tests, gmail_auth): the nearest .env up
+# the tree, falling back to the project root when none exists yet. Never overrides real env vars.
+ENV_PATH = Path(find_dotenv() or Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(ENV_PATH)
 
 
 class ConfigManager:
