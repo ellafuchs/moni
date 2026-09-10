@@ -33,3 +33,11 @@ def test_values_come_from_the_dotenv_file_that_python_dotenv_finds(tmp_path, mon
     finally:
         monkeypatch.undo()
         importlib.reload(config_manager)   # back to the real .env for the other tests
+
+
+def test_redirect_uri_defaults_to_localhost_and_follows_the_env_var(monkeypatch):
+    import gmail_auth
+    monkeypatch.delenv(gmail_auth.REDIRECT_URI_ENV, raising=False)
+    assert gmail_auth.redirect_uri() == "http://localhost"
+    monkeypatch.setenv(gmail_auth.REDIRECT_URI_ENV, "https://moni.example.org/oauth")
+    assert gmail_auth.redirect_uri() == "https://moni.example.org/oauth"

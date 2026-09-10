@@ -24,6 +24,13 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from common.config_manager import ENV_PATH, ConfigManager
 from notifier import GMAIL_SEND_SCOPE, TOKEN_URI
 
+REDIRECT_URI_ENV = "GOOGLE_OAUTH_REDIRECT_URI"
+
+
+def redirect_uri() -> str:
+    """Where Google sends the browser back after consent: localhost on a laptop, the
+    server's own address on a deployment (set GOOGLE_OAUTH_REDIRECT_URI in .env)."""
+    return os.environ.get(REDIRECT_URI_ENV) or "http://localhost"
 
 
 def main() -> int:
@@ -39,7 +46,7 @@ def main() -> int:
             "client_secret": client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": TOKEN_URI,
-            "redirect_uris": ["http://localhost"],
+            "redirect_uris": [redirect_uri()],
         }
     }
     flow = InstalledAppFlow.from_client_config(client_config, scopes=[GMAIL_SEND_SCOPE])
