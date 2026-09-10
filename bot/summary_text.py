@@ -51,7 +51,10 @@ def structure_summary(text: str) -> str:
     Idempotent: text that already has the line breaks comes back unchanged apart from
     whitespace normalisation. Known PDF split-word artifact 'השי נוי' is repaired.
     """
-    text = join_split_letters(re.sub(r"הש[יי] נוי", "השינוי", text or ""))
+    # The model sometimes escapes its line breaks ("\\n" as two characters); make them real
+    # before anything else, or they survive into the page as literal backslash-n.
+    text = (text or "").replace("\\n", "\n").replace("\\t", " ")
+    text = join_split_letters(re.sub(r"הש[יי] נוי", "השינוי", text))
     # The staffing statement is shown as its own fact tile; keep it out of the narrative.
     text = re.sub(r"\s*השפעה על כו?ח אדם\s*:\s*[^\n.]*\.?\s*$", "", text)
     text = _HEADING.sub(lambda m: "\n" + m.group(0), text)

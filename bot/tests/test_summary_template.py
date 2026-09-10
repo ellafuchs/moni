@@ -228,3 +228,14 @@ def test_history_with_blank_duplicate_headings_never_leaks_pandas_text():
     html = Reports().render_summary_html(**sample)
     assert "dtype" not in html and "Name: " not in html
     assert "702001" in html and "591,451" in html
+
+
+def test_escaped_newlines_from_the_model_become_real_line_breaks():
+    """21774: the model returned '\\n' as two characters inside the narrative."""
+    from summary_text import structure_summary
+    assert structure_summary("א\\nב") == "א\nב"
+    intro, programs = split_programs(
+        "הפנייה נועדה לתקצוב סך של 29,600 אלפי ש\"ח\\nבהרשאה להתחייב.\\n"
+        "830402: פרויקטים בתכנו ן\\nתיאור התוכנית: במסגרת תוכנית זו.\\nמטרת השינוי: תקצוב.")
+    assert "\\n" not in intro and programs[0].heading == "פרויקטים בתכנון"
+    assert programs[0].description == "במסגרת תוכנית זו." and programs[0].purpose == "תקצוב."
