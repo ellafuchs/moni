@@ -43,10 +43,6 @@ function bindPageActions() {
     if (action === 'save-mailing-list') saveMailingList();
   });
 
-  const mailboxForm = document.getElementById('mailboxForm');
-  if (mailboxForm) {
-    mailboxForm.addEventListener('submit', saveNotifierConfig);
-  }
 }
 
 async function initializeSchedulePage() {
@@ -102,17 +98,20 @@ async function initializeMailingPage() {
 }
 
 async function initializeMailboxPage() {
-  const mailboxForm = document.getElementById('mailboxForm');
-  if (!mailboxForm) return;
+  const emailField = document.getElementById('senderEmail');
+  if (!emailField) return;
 
+  const status = document.getElementById('pageStatus');
   try {
     const notifier = await apiRequest('/api/v1/notifier');
-    const email = typeof notifier === 'string' ? notifier : notifier?.email;
-    if (email) {
-      document.getElementById('email').value = email;
+    emailField.textContent = notifier?.email || '—';
+    if (notifier?.configured) {
+      setStatus(status, 'תיבת הדואר מוגדרת.');
+    } else {
+      setStatus(status, 'תיבת הדואר לא מוגדרת. יש למלא את ערכי Google בקובץ .env, להריץ bot/gmail_auth.py ולהפעיל את השרת מחדש.', true);
     }
   } catch {
-    setStatus(document.getElementById('pageStatus'), 'לא ניתן לטעון את הגדרות תיבת הדואר מהשרת.', true);
+    setStatus(status, 'לא ניתן לטעון את הגדרות תיבת הדואר מהשרת.', true);
   }
 }
 
@@ -417,34 +416,6 @@ async function saveMailingList() {
     setStatus(status, 'רשימת התפוצה נשמרה.');
   } catch (error) {
     setStatus(status, error.message || 'לא ניתן לשמור את רשימת התפוצה.', true);
-  }
-}
-
-async function saveNotifierConfig(event) {
-  event.preventDefault();
-
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value.trim();
-  const error = document.getElementById('error');
-  const status = document.getElementById('pageStatus');
-
-  if (!event.currentTarget.checkValidity() || !email || !password) {
-    error.style.display = 'block';
-    setStatus(status, 'יש למלא אימייל וסיסמה תקינים.', true);
-    return;
-  }
-
-  try {
-    await apiRequest('/api/v1/notifier', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    error.style.display = 'none';
-    setStatus(status, 'כתובת הדואר עודכנה.');
-  } catch (errorMessage) {
-    error.style.display = 'block';
-    setStatus(status, errorMessage.message || 'לא ניתן לעדכן את הגדרות תיבת הדואר.', true);
   }
 }
 

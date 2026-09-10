@@ -18,34 +18,25 @@
 
     <div class="mailbox-content">
       <div class="green-btn">
-        <span>עדכון תיבת דואר</span>
+        <span>תיבת הדואר השולחת</span>
         <span class="icon"><i class="fa-regular fa-envelope"></i></span>
       </div>
 
-      <form class="mailbox-form mailbox-card" id="mailboxForm">
+      <div class="mailbox-card mailbox-readonly">
         <div class="mailbox-field">
-          <label for="email">אימייל</label>
+          <label>כתובת השולח</label>
           <div class="input-shell">
             <i class="fa-regular fa-envelope"></i>
-            <input id="email" class="mailbox-input" type="email" placeholder="mail@example.com" autocomplete="email" required>
+            <span id="senderEmail" class="mailbox-input" dir="ltr">…</span>
           </div>
         </div>
-
-        <div class="mailbox-field">
-          <label for="password">סיסמה</label>
-          <div class="input-shell">
-            <i class="fa-solid fa-lock"></i>
-            <input id="password" class="mailbox-input" type="password" placeholder="סיסמת תיבת הדואר" autocomplete="current-password" required>
-          </div>
-        </div>
-
-        <button class="mailbox-submit mailbox-save" type="submit">שמור</button>
-
-        <div id="error" class="mailbox-error">
-          יש למלא אימייל וסיסמה תקינים
-        </div>
+        <p class="mailbox-hint">
+          השליחה מתבצעת דרך Gmail API. כתובת השולח ופרטי ההרשאה של Google נשמרים רק בקובץ
+          <code>.env</code> בתיקיית הפרויקט (<code>MONI_SENDER</code>, <code>GOOGLE_CLIENT_ID</code>,
+          <code>GOOGLE_CLIENT_SECRET</code>, <code>GOOGLE_REFRESH_TOKEN</code>) ולא ניתן לשנותם מכאן.
+        </p>
         <div id="pageStatus" class="page-status" role="status"></div>
-      </form>
+      </div>
     </div>
   </main>
 </body>

@@ -33,12 +33,20 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 MASTER_COLUMN = "master"
-DEFAULT_MODEL = "gpt-4o"
+DEFAULT_MODELS = {
+    "openai": "gpt-4o",
+    "google_genai": "gemini-3.6-flash",
+}
+DEFAULT_MODEL = DEFAULT_MODELS["openai"]
 
 # Rough list price, USD per 1M tokens (input, output) — for the on-report cost estimate.
+# Gemini Flash runs on the free tier here, so its cost is reported as 0.
 PRICING_USD_PER_1M = {
     "gpt-4o": (2.50, 10.00),
     "gpt-4o-mini": (0.15, 0.60),
+    "gemini-3.6-flash": (0.0, 0.0),
+    "gemini-3.5-flash": (0.0, 0.0),
+    "gemini-3.5-flash-lite": (0.0, 0.0),
 }
 
 
@@ -88,8 +96,8 @@ class Agent:
     def __init__(self, master_programs, *, api_key=None, model=None, provider=None):
         self.master = set(master_programs)
         self.api_key = api_key
-        self.model = model or DEFAULT_MODEL
         self.provider = provider
+        self.model = model or DEFAULT_MODELS.get(provider or "openai", DEFAULT_MODEL)
 
     @classmethod
     def from_config(cls, config, master_path: str) -> "Agent":

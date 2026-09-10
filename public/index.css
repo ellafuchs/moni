@@ -680,3 +680,8 @@ body {
   direction: rtl;
   line-height: 1.35;
 }
+
+/* Mailbox page is read-only: credentials live in .env */
+.mailbox-readonly .mailbox-input { display: inline-block; min-height: 1.5em; }
+.mailbox-hint { font-size: 0.85rem; color: #666; line-height: 1.5; margin: 0.75rem 0; }
+.mailbox-hint code { direction: ltr; unicode-bidi: embed; background: #f0f0f0; padding: 0 0.25em; border-radius: 3px; }
