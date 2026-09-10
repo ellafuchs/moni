@@ -21,6 +21,12 @@ from main import CONFIG_PATH, MASTER_PATH, OUTPUT_DIR, email_reports, render_sum
 from utils_function import _slug
 
 
+def page_source(saved: str | None, given: str) -> str:
+    """The address shown on the page: the saved letter URL wins over a local path."""
+    saved = str(saved or "")
+    return saved if saved.startswith("http") and not str(given).startswith("http") else str(given)
+
+
 def run(source: str, *, rerender: bool = False):
     """Extract one letter and render its summary PDF; return (rendered, result).
 
@@ -46,6 +52,9 @@ def run(source: str, *, rerender: bool = False):
         from request_fields import RequestFields
         data = json.loads(saved.read_text(encoding="utf-8"))
         letter = agent.BudgetLetter(source)
+        # Re-rendering from the cached PDF must keep the letter's real address for the
+        # page footer, not the local file it was re-rendered from.
+        letter.source = page_source(data.get("source"), source)
         table, matched = extractor._table(letter)
         result = agent.Extraction(RequestFields(**data["fields"]), table, matched, bool(matched),
                                   letter, data.get("llm_usage"), data.get("coalition_reason", ""))

@@ -114,3 +114,12 @@ def test_email_body_lists_every_request_number():
     assert "• 21703" in body and "• 21772" in body
     assert "21703_summary" not in body
     assert main.email_body([("a.pdf", "21703_summary")]).count("פנייה בסיכום זה (1):") == 1
+
+
+def test_rerender_keeps_the_saved_letter_url_over_a_local_path():
+    from run_url import page_source
+    url = "https://fs.knesset.gov.il/globaldocs/x/4_x_13_21766.pdf"
+    assert page_source(url, "files/outputs/21766_original.pdf") == url
+    assert page_source(url, "https://other/21766.pdf") == "https://other/21766.pdf"
+    assert page_source(None, "files/outputs/21766_original.pdf") == "files/outputs/21766_original.pdf"
+    assert page_source("files/x.pdf", "files/outputs/21766_original.pdf") == "files/outputs/21766_original.pdf"
