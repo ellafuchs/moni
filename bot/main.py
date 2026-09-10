@@ -126,7 +126,7 @@ def email_body(path_names) -> str:
     """The request numbers go in the body, one per line, so the subject stays short."""
     ids = [name.removesuffix("_summary") for _, name in path_names]
     head = ("מצורף סיכום אוטומטי של פניות תקציביות הרלוונטיות לתוכניות הקרן, "
-            "כל פנייה כ-PDF וכדף HTML (בו הקישורים לחיצים).")
+            "כל פנייה כקובץ PDF מצורף.")
     if not ids:
         return head
     plural = "פניות" if len(ids) > 1 else "פנייה"
@@ -165,9 +165,6 @@ def email_reports(sender: str | None, recipients: list[str], path_names) -> bool
     for path, name in path_names:
         with open(path, "rb") as f:
             attachments.append(Attachment(f.read(), f"{name}.pdf"))
-        html = Path(path).with_suffix(".html")
-        if html.is_file():  # the same page as HTML — clickable links, easy to forward
-            attachments.append(Attachment(html.read_bytes(), f"{name}.html"))
     send_email(sender, recipients, email_subject(path_names), email_body(path_names), attachments)
     logger.info("emailed %d PDF(s) to %s", len(attachments), ", ".join(recipients))
     return True
