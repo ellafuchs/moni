@@ -215,3 +215,16 @@ def test_narrative_without_headings_is_still_rendered():
     sample["fields"] = sample["fields"].model_copy(update={"request_summary": "פסקה ראשונה.\nתיאור התוכנית: משהו.\nמטרת השינוי: אחר."})
     html = Reports().render_summary_html(**sample)
     assert "עיקרי הפנייה" in html and "פסקה ראשונה." in html
+
+
+def test_history_with_blank_duplicate_headings_never_leaks_pandas_text():
+    """21766: a history table whose header pdfplumber left mostly blank must still render
+    its values, never a Series repr like 'Name: 0, dtype: str'."""
+    import pandas as pd
+    sample = _sample()
+    df = pd.DataFrame([["702001", "4,090", "591,451"], ["702002", "10", "20"]],
+                      columns=["", "השינוי", ""])            # two blank, duplicate names
+    sample["budget_history"] = [("היסטוריה תקציבית של הפנייה - הוצאה נטו", df)]
+    html = Reports().render_summary_html(**sample)
+    assert "dtype" not in html and "Name: " not in html
+    assert "702001" in html and "591,451" in html

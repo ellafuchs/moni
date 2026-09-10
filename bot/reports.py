@@ -233,7 +233,9 @@ class Reports:
             columns = [clean_header(c) for c in df.columns]
             rows = []
             for _, rec in df.iterrows():
-                cells = [str(rec[df.columns[0]]).strip()] + [format_history_cell(rec[c]) for c in df.columns[1:]]
+                # By position, never by column label: a table with blank or duplicate
+                # headings would otherwise hand back a Series (and its repr) per cell.
+                cells = [str(rec.iloc[0]).strip()] + [format_history_cell(v) for v in rec.iloc[1:]]
                 rows.append({"cells": cells, "in_master": cells[0].strip() in matched})
             history.append({"title": clean_header(title), "columns": columns, "rows": rows})
 

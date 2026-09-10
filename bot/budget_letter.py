@@ -277,8 +277,21 @@ class BudgetLetter:
         import pandas as pd
 
         if self._is_header_row(table[0]):
-            header, *data = table
-            columns = [self._clean_name(cell) for cell in header]
+            # The header may span several rows (21766: 'מאושר 2025' / 'בניכוי עודפים' /
+            # 'שעברו ב-2025' stacked in one column). Every leading row with Hebrew text is
+            # header; a column's name is its non-empty pieces joined top to bottom. Capped at
+            # three rows so a table without code rows cannot be swallowed whole.
+            n_header = 0
+            while n_header < min(3, len(table)) and self._is_header_row(table[n_header]):
+                n_header += 1
+            header_rows, data = table[:n_header], table[n_header:]
+            width = max(len(r) for r in header_rows)
+            columns = [
+                self._clean_name(" ".join(
+                    piece for piece in ((r[i] if i < len(r) else "") or "" for r in header_rows)
+                    if piece and piece.strip()))
+                for i in range(width)
+            ]
         else:
             # A continuation page whose title row pdfplumber dropped: no header to show,
             # so render every row as data under blank headings (never numbers-as-title).
